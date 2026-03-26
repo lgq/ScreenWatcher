@@ -110,7 +110,7 @@
       }
     },
     {
-      "name": "悟空 - 明日签到",
+      "name": "悟空 - 看视频+金币",
       "screen_text": [
         "明日签到",
         "已连续签到",
@@ -120,13 +120,17 @@
         "type": "click_text",
         "target": "看视频+"
       }
+    },
+    {
+      "name": "悟空 - 看视频再得金币",
+      "screen_text": [
+        "恭喜您已获得",
+        "看视频再得"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "看视频再得"
+      }
     }
-
-  ],
-  "settings": {
-    "adb_path": "adb",
-    "poll_interval_seconds": 3,
-    "run_duration_minutes": 30,
-    "screenshot_dir": "temp_screenshots"
-  }
+  ]
 }
