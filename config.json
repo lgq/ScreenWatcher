@@ -1,0 +1,132 @@
+{
+  "scenarios": [
+    {
+      "name": "看视频再领",
+      "screen_text": [
+        "恭喜你获得",
+        "现金收益",
+        "看视频再领"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "看视频再领"
+      }
+    },
+    {
+      "name": "看短剧赚金币",
+      "screen_text": [
+        "金币收益",
+        "现金收益",
+        "看短剧赚金币",
+        "立即领取"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "立即领取"
+      }
+    },
+    {
+      "name": "签到领金币",
+      "screen_text": [
+        "金币收益",
+        "现金收益",
+        "签到领金币",
+        "去签到"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "去签到"
+      }
+    },
+    {
+      "name": "今日签到",
+      "screen_text": [
+        "今日签到领",
+        "立即签到"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "立即签到"
+      }
+    },
+    {
+      "name": "退出今日签到",
+      "screen_text": [
+        "明日签到领",
+        "明日签到可领"
+      ],
+      "action": {
+        "type": "click_coords",
+        "x": 633,
+        "y": 2067
+      }
+    },
+    {
+      "name": "领取奖励",
+      "screen_text": [
+        "坚持退出",
+        "领取奖励"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "领取奖励"
+      }
+    },
+    {
+      "name": "领取成功 X",
+      "screen_text": [
+        "广告",
+        "领取成功",
+        "×"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "×"
+      }
+    },
+    {
+      "name": "看完所有广告",
+      "screen_text": [
+        "恭喜你已累计获得奖励"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "开心收下"
+      }
+    },
+
+
+
+
+    {
+      "name": "悟空 - 今日签到",
+      "screen_text": [
+        "今日签到领",
+        "立即领取"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "立即领取"
+      }
+    },
+    {
+      "name": "悟空 - 明日签到",
+      "screen_text": [
+        "明日签到",
+        "已连续签到",
+        "看视频+"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "看视频+"
+      }
+    }
+
+  ],
+  "settings": {
+    "adb_path": "adb",
+    "poll_interval_seconds": 3,
+    "run_duration_minutes": 30,
+    "screenshot_dir": "temp_screenshots"
+  }
+}

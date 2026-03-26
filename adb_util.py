@@ -1,0 +1,156 @@
+
+import subprocess
+import os
+from typing import List
+
+def get_connected_devices(adb_path: str) -> List[str]:
+    """
+    获取通过 ADB 连接的所有设备的序列号。
+
+    :param adb_path: adb 可执行文件的路径。
+    :return: 一个包含所有设备序列号的列表。
+    """
+    try:
+        result = subprocess.check_output([adb_path, "devices"], universal_newlines=True)
+        devices = []
+        for line in result.strip().split('\n')[1:]: # Skip the first line "List of devices attached"
+            if "device" in line:
+                serial = line.split('\t')[0]
+                devices.append(serial)
+        return devices
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"执行 adb devices 失败: {e}")
+        return []
+
+def take_screenshot(adb_path: str, device_serial: str, local_path: str) -> bool:
+    """
+    使用 ADB 从指定设备截屏并保存到本地。
+
+    :param adb_path: adb 可执行文件的路径。
+    :param device_serial: 目标设备的序列号。
+    :param local_path: 截图保存到本地的路径。
+    :return: 如果成功则返回 True，否则返回 False。
+    """
+    try:
+        # 在设备上截屏
+        device_path = "/sdcard/screenshot.png"
+        subprocess.check_call([adb_path, "-s", device_serial, "shell", "screencap", device_path])
+        # 将截图文件拉取到本地
+        subprocess.check_call([adb_path, "-s", device_serial, "pull", device_path, local_path])
+        # 删除设备上的临时截图文件
+        subprocess.check_call([adb_path, "-s", device_serial, "shell", "rm", device_path])
+        print(f"设备 {device_serial} 截图已保存至: {local_path}")
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"设备 {device_serial} 截图失败: {e}")
+        return False
+
+def click(adb_path: str, device_serial: str, x: int, y: int):
+    """
+    在指定设备的特定坐标处执行点击操作。
+
+    :param adb_path: adb 可执行文件的路径。
+    :param device_serial: 目标设备的序列号。
+    :param x: 点击位置的 x 坐标。
+    :param y: 点击位置的 y 坐标。
+    """
+    try:
+        print(f"在设备 {device_serial} 上点击坐标: ({x}, {y})")
+        subprocess.check_call([adb_path, "-s", device_serial, "shell", "input", "tap", str(x), str(y)])
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"在设备 {device_serial} 上点击失败: {e}")
+
+def swipe(adb_path: str, device_serial: str, start_x: int, start_y: int, end_x: int, end_y: int, duration_ms: int):
+    """
+    在指定设备上执行滑动操作。
+
+    :param adb_path: adb 可执行文件的路径。
+    :param device_serial: 目标设备的序列号。
+    :param start_x: 滑动起点的 x 坐标。
+    :param start_y: 滑动起点的 y 坐标。
+    :param end_x: 滑动终点的 x 坐标。
+    :param end_y: 滑动终点的 y 坐标。
+    :param duration_ms: 滑动持续时间（毫秒）。
+    """
+    try:
+        print(f"在设备 {device_serial} 上滑动: 从 ({start_x}, {start_y}) 到 ({end_x}, {end_y})")
+        subprocess.check_call([
+            adb_path, "-s", device_serial, "shell", "input", "swipe",
+            str(start_x), str(start_y), str(end_x), str(end_y), str(duration_ms)
+        ])
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"在设备 {device_serial} 上滑动失败: {e}")
+
+def launch_app(adb_path: str, device_serial: str, package_name: str):
+    """
+    在指定设备上启动一个应用程序。
+
+    :param adb_path: adb 可执行文件的路径。
+    :param device_serial: 目标设备的序列号。
+    :param package_name: 要启动的应用的包名。
+    """
+    try:
+        print(f"在设备 {device_serial} 上启动应用: {package_name}")
+        # 先停止应用，再启动
+        subprocess.check_call([
+            adb_path, "-s", device_serial, "shell", "am", "force-stop", package_name
+        ])
+        subprocess.check_call([
+            adb_path, "-s", device_serial, "shell", "monkey", "-p", package_name,
+            "-c", "android.intent.category.LAUNCHER", "1"
+        ])
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"在设备 {device_serial} 上启动应用 {package_name} 失败: {e}")
+
+def back_home(adb_path: str, device_serial: str):
+    """
+    返回设备主屏幕。
+
+    :param adb_path: adb 可执行文件的路径。
+    :param device_serial: 目标设备的序列号。
+    """
+    try:
+        print(f"在设备 {device_serial} 上返回主屏幕")
+        subprocess.check_call([adb_path, "-s", device_serial, "shell", "input", "keyevent", "3"])
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"在设备 {device_serial} 上返回主屏幕失败: {e}")
+
+
+if __name__ == '__main__':
+    # --- 测试代码 ---
+    # 请确保你的 adb 在系统路径中，或者在此处提供完整路径
+    ADB_PATH = "adb"
+    
+    print("--- 正在获取连接的设备 ---")
+    devices = get_connected_devices(ADB_PATH)
+    if not devices:
+        print("未检测到任何设备。")
+    else:
+        print(f"检测到设备: {devices}")
+        # 选择第一个设备进行测试
+        test_device = devices[0]
+        
+        # 测试截图
+        print("\n--- 正在测试截图 ---")
+        if not os.path.exists("temp_screenshots"):
+            os.makedirs("temp_screenshots")
+        screenshot_path = os.path.join("temp_screenshots", f"{test_device}_test.png")
+        take_screenshot(ADB_PATH, test_device, screenshot_path)
+        
+        # 测试点击 (请谨慎使用，这会在你的设备上执行真实点击)
+        # print("\n--- 正在测试点击 (5秒后在 500, 1500 点击) ---")
+        # import time
+        # time.sleep(5)
+        # click(ADB_PATH, test_device, 500, 1500)
+        
+        # 测试滑动 (请谨慎使用)
+        # print("\n--- 正在测试滑动 (5秒后) ---")
+        # time.sleep(5)
+        # swipe(ADB_PATH, test_device, 500, 1500, 500, 500, 300)
+
+        # 测试启动应用 (请将'com.android.settings'替换为你想启动的应用包名)
+        # print("\n--- 正在测试启动系统设置 (5秒后) ---")
+        # time.sleep(5)
+        # launch_app(ADB_PATH, test_device, "com.android.settings")
+
+    print("\n--- adb_util.py 测试完成 ---")
