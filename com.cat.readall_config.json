@@ -36,6 +36,30 @@
       }
     },
     {
+      "name": "悟空 - 看视频再得金币",
+      "screen_text": [
+        "恭喜获得惊喜奖励",
+        "看视频再领"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "看视频再领",
+        "scope": "center"
+      }
+    },
+    {
+      "name": "悟空 - 看视频再得金币",
+      "screen_text": [
+        "恭喜获得奖励",
+        "看视频再领"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "看视频再领",
+        "scope": "center"
+      }
+    },
+    {
       "name": "悟空 - 广告",
       "screen_text": [
         "广告",
@@ -48,6 +72,19 @@
         "type": "click_text",
         "target": "关闭",
         "scope": "top"
+      }
+    },
+    {
+      "name": "悟空 - 广告",
+      "screen_text": [
+        "秒可领奖励",
+        "继续观看",
+        "坚持退出"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "继续观看",
+        "scope": "center"
       }
     }
   ]
