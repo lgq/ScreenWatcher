@@ -14,6 +14,22 @@ async def process_device(device_serial: str):
     """
     print(f"\n----- 正在处理设备: {device_serial} -----")
     
+    # 0. 获取当前运行的 App 包名并加载对应配置
+    adb_path = CONFIG['settings']['adb_path']
+    current_app = adb_util.get_foreground_app(adb_path, device_serial)
+    
+    if current_app:
+        app_config_path = f"{current_app}_config.json"
+        if os.path.exists(app_config_path):
+            print(f"[{device_serial}] 当前前台应用: '{current_app}'，正在加载专属配置: {app_config_path}")
+            load_config(config_path=app_config_path)
+        else:
+            print(f"[{device_serial}] 未找到 '{current_app}' 的专属配置，回退使用默认 config.json")
+            load_config(config_path="config.json")
+    else:
+        print(f"[{device_serial}] 无法获取前台应用或处于桌面，回退使用默认 config.json")
+        load_config(config_path="config.json")
+
     # 1. 截图
     screenshot_dir = CONFIG['settings']['screenshot_dir']
     screenshot_path = os.path.join(screenshot_dir, f"{device_serial}_{int(time.time())}.png")
@@ -23,7 +39,11 @@ async def process_device(device_serial: str):
         return
 
     # 2. 识别界面并执行操作
-    for scenario in CONFIG['scenarios']:
+    scenarios = CONFIG.get('scenarios', [])
+    if not scenarios:
+        print(f"[{device_serial}] 当前配置中没有可用场景，跳过处理。")
+        
+    for scenario in scenarios:
         print(f"[{device_serial}] 正在检查界面: '{scenario['name']}'")
         screen_text_config = scenario['screen_text']
         
@@ -45,7 +65,6 @@ async def process_device(device_serial: str):
             print(f"[{device_serial}] 识别到界面: '{scenario['name']}' (匹配文字: {screen_texts})")
             action = scenario['action']
             action_type = action['type']
-            adb_path = CONFIG['settings']['adb_path']
 
             if action_type == 'click_coords':
                 adb_util.click(adb_path, device_serial, action['x'], action['y'])

@@ -1,0 +1,6 @@
+{
+  "adb_path": "adb",
+  "poll_interval_seconds": 3,
+  "run_duration_minutes": 30,
+  "screenshot_dir": "temp_screenshots"
+}

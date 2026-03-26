@@ -22,6 +22,31 @@ def get_connected_devices(adb_path: str) -> List[str]:
         print(f"执行 adb devices 失败: {e}")
         return []
 
+def get_foreground_app(adb_path: str, device_serial: str) -> str:
+    """
+    获取指定设备当前前台运行的应用包名。
+
+    :param adb_path: adb 可执行文件的路径。
+    :param device_serial: 目标设备的序列号。
+    :return: 当前前台应用的包名（例如 "com.tencent.mm"），获取失败则返回空字符串。
+    """
+    try:
+        result = subprocess.check_output(
+            [adb_path, "-s", device_serial, "shell", "dumpsys", "window"],
+            universal_newlines=True, encoding='utf-8', errors='ignore'
+        )
+        for line in result.splitlines():
+            if "mCurrentFocus" in line:
+                if "null" in line:
+                    return ""
+                parts = line.split('/')
+                if len(parts) > 0:
+                    return parts[0].split(' ')[-1].replace('}', '')
+        return ""
+    except Exception as e:
+        print(f"设备 {device_serial} 获取前台应用失败: {e}")
+        return ""
+
 def take_screenshot(adb_path: str, device_serial: str, local_path: str) -> bool:
     """
     使用 ADB 从指定设备截屏并保存到本地。
