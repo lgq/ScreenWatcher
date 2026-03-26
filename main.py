@@ -61,6 +61,21 @@ async def process_device(device_serial: str):
                 is_match = False
                 break
                 
+        # 检查是否包含不能出现的文字
+        if is_match and 'screen_text_not_include' in scenario:
+            not_include_config = scenario['screen_text_not_include']
+            if isinstance(not_include_config, str):
+                not_include_texts = [not_include_config]
+            else:
+                not_include_texts = not_include_config
+                
+            for text in not_include_texts:
+                coords = await util.find_text_in_image(screenshot_path, text)
+                if coords:
+                    is_match = False
+                    print(f"[{device_serial}] 界面 '{scenario['name']}' 匹配失败: 包含被排除的文字 '{text}'")
+                    break
+
         if is_match:
             print(f"[{device_serial}] 识别到界面: '{scenario['name']}' (匹配文字: {screen_texts})")
             action = scenario['action']
