@@ -71,8 +71,15 @@ async def process_device(device_serial: str):
 
             elif action_type == 'click_text':
                 target_text = action['target']
-                print(f"[{device_serial}] 正在查找并点击文字: '{target_text}'")
-                target_coords = await util.find_text_in_image(screenshot_path, target_text)
+                scope = action.get('scope')
+                
+                print(f"[{device_serial}] 正在查找并点击文字: '{target_text}'" + (f" (范围: {scope})" if scope else ""))
+                
+                if scope:
+                    target_coords = await util.find_text_in_image_with_scope(screenshot_path, target_text, scope)
+                else:
+                    target_coords = await util.find_text_in_image(screenshot_path, target_text)
+                    
                 if target_coords:
                     x, y, w, h = target_coords
                     # center_x, center_y = x + w // 2, y + h // 2

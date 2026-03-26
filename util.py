@@ -8,6 +8,7 @@ from winrt.windows.globalization import Language
 from winrt.windows.graphics.imaging import BitmapDecoder
 from winrt.windows.media.ocr import OcrEngine
 from winrt.windows.storage import StorageFile, FileAccessMode
+from PIL import Image
 
 import adb_util
 from config_manager import CONFIG, load_config
@@ -68,6 +69,48 @@ async def find_text_in_image(image_path: str, target_text: str) -> Optional[Tupl
 
     return None
 
+
+async def find_text_in_image_with_scope(image_path: str, target_text: str, scope: str) -> Optional[Tuple[int, int, int, int]]:
+    """
+    先按范围裁剪图片，然后再调用 OCR 识别文字，并将坐标映射回原图。
+    
+    :param image_path: 图片的路径
+    :param target_text: 要查找的文字
+    :param scope: 裁剪范围，'top' / 'center' / 'bottom'
+    :return: 映射回原图的坐标 (x, y, width, height)
+    """
+    if scope not in ['top', 'center', 'bottom']:
+        return await find_text_in_image(image_path, target_text)
+        
+    try:
+        with Image.open(image_path) as img:
+            width, height = img.size
+            
+            if scope == 'top':
+                box = (0, 0, width, int(height * 0.2))
+            elif scope == 'center':
+                box = (0, int(height * 0.2), width, int(height * 0.8))
+            elif scope == 'bottom':
+                box = (0, int(height * 0.8), width, height)
+                
+            cropped_img = img.crop(box)
+            temp_path = f"{image_path}.{scope}.png"
+            cropped_img.save(temp_path)
+            
+        try:
+            coords = await find_text_in_image(temp_path, target_text)
+        finally:
+            # 无论识别成功还是失败，都清理掉裁剪的临时图片
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+                
+        if coords:
+            x, y, w, h = coords
+            return (x + box[0], y + box[1], w, h)
+    except Exception as e:
+        print(f"裁剪图片时发生错误: {e}")
+        
+    return None
 
 async def get_all_text_from_image(image_path: str) -> List[Dict[str, Any]]:
     """

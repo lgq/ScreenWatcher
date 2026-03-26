@@ -31,7 +31,8 @@
       ],
       "action": {
         "type": "click_text",
-        "target": "看视频再得"
+        "target": "看视频再得",
+        "scope": "center"
       }
     }
   ]
