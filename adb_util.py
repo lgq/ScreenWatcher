@@ -1,6 +1,7 @@
 
 import subprocess
 import os
+import re
 from typing import List
 
 def get_connected_devices(adb_path: str) -> List[str]:
@@ -38,10 +39,23 @@ def get_foreground_app(adb_path: str, device_serial: str) -> str:
         for line in result.splitlines():
             if "mCurrentFocus" in line:
                 if "null" in line:
-                    return ""
-                parts = line.split('/')
-                if len(parts) > 0:
-                    return parts[0].split(' ')[-1].replace('}', '')
+                    continue  # 遇到多屏中某个屏幕焦点为空时，跳过并继续寻找下一个屏幕
+                # 使用正则精确提取包名（匹配最后一个空格和 / 之间的合法应用包名）
+                match = re.search(r'\s([a-zA-Z0-9_\.]+)/', line)
+                if match:
+                    return match.group(1)
+                        
+        # 如果 dumpsys window 没找到，使用备用方案查询 activity
+        result_activity = subprocess.check_output(
+            [adb_path, "-s", device_serial, "shell", "dumpsys", "activity", "activities"],
+            universal_newlines=True, encoding='utf-8', errors='ignore'
+        )
+        for line in result_activity.splitlines():
+            if "mResumedActivity" in line or "ResumedActivity" in line:
+                match = re.search(r'\s([a-zA-Z0-9_\.]+)/', line)
+                if match:
+                    return match.group(1)
+                        
         return ""
     except Exception as e:
         print(f"设备 {device_serial} 获取前台应用失败: {e}")
@@ -59,7 +73,12 @@ def take_screenshot(adb_path: str, device_serial: str, local_path: str) -> bool:
     try:
         # 在设备上截屏
         device_path = "/sdcard/screenshot.png"
-        subprocess.check_call([adb_path, "-s", device_serial, "shell", "screencap", device_path])
+        try:
+            # 先尝试带 -d 0 参数截屏以消除多屏幕警告（屏蔽错误输出）
+            subprocess.check_call([adb_path, "-s", device_serial, "shell", "screencap", "-d", "0", device_path], stderr=subprocess.DEVNULL)
+        except subprocess.CalledProcessError:
+            # 若该设备不支持此参数，回退到默认的截屏命令
+            subprocess.check_call([adb_path, "-s", device_serial, "shell", "screencap", device_path])
         # 将截图文件拉取到本地
         subprocess.check_call([adb_path, "-s", device_serial, "pull", device_path, local_path])
         # 删除设备上的临时截图文件
