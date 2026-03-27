@@ -16,6 +16,7 @@ async def process_device(device_serial: str):
     
     # 0. 获取当前运行的 App 包名并加载对应配置
     adb_path = CONFIG['settings']['adb_path']
+    keep_scope_temp_images = bool(CONFIG['settings'].get('keep_scope_temp_images', False))
     current_app = adb_util.get_foreground_app(adb_path, device_serial)
     
     if current_app:
@@ -54,6 +55,19 @@ async def process_device(device_serial: str):
         
     for scenario in scenarios:
         # print(f"[{device_serial}] 正在检查界面: '{scenario['name']}'")
+        action = scenario.get('action', {})
+        scope = scenario.get('scope') or action.get('scope')
+
+        async def find_text_for_scenario(text: str):
+            if scope:
+                return await util.find_text_in_image_with_scope(
+                    screenshot_path,
+                    text,
+                    scope,
+                    keep_temp=keep_scope_temp_images,
+                )
+            return await util.find_text_in_image(screenshot_path, text)
+
         screen_text_config = scenario['screen_text']
         
         # 兼容单个字符串或字符串列表（若是列表，则必须全部包含）
@@ -65,7 +79,7 @@ async def process_device(device_serial: str):
         # 检查是否所有要求的文字都在屏幕上
         is_match = True
         for text in screen_texts:
-            coords = await util.find_text_in_image(screenshot_path, text)
+            coords = await find_text_for_scenario(text)
             if not coords:
                 is_match = False
                 break
@@ -79,15 +93,17 @@ async def process_device(device_serial: str):
                 not_include_texts = not_include_config
                 
             for text in not_include_texts:
-                coords = await util.find_text_in_image(screenshot_path, text)
+                coords = await find_text_for_scenario(text)
                 if coords:
                     is_match = False
                     print(f"[{device_serial}] 界面 '{scenario['name']}' 匹配失败: 包含被排除的文字 '{text}'")
                     break
 
         if is_match:
-            print(f"[{device_serial}] 识别到界面: '{scenario['name']}' (匹配文字: {screen_texts})")
-            action = scenario['action']
+            print(
+                f"[{device_serial}] 识别到界面: '{scenario['name']}' "
+                f"(匹配文字: {screen_texts}" + (f", scope: {scope}" if scope else "") + ")"
+            )
             action_type = action['type']
 
             if action_type == 'click_coords':
@@ -95,14 +111,9 @@ async def process_device(device_serial: str):
 
             elif action_type == 'click_text':
                 target_text = action['target']
-                scope = action.get('scope')
                 
                 print(f"[{device_serial}] 正在查找并点击文字: '{target_text}'" + (f" (范围: {scope})" if scope else ""))
-                
-                if scope:
-                    target_coords = await util.find_text_in_image_with_scope(screenshot_path, target_text, scope)
-                else:
-                    target_coords = await util.find_text_in_image(screenshot_path, target_text)
+                target_coords = await find_text_for_scenario(target_text)
                     
                 if target_coords:
                     x, y, w, h = target_coords

@@ -70,16 +70,22 @@ async def find_text_in_image(image_path: str, target_text: str) -> Optional[Tupl
     return None
 
 
-async def find_text_in_image_with_scope(image_path: str, target_text: str, scope: str) -> Optional[Tuple[int, int, int, int]]:
+async def find_text_in_image_with_scope(
+    image_path: str,
+    target_text: str,
+    scope: str,
+    keep_temp: bool = False,
+) -> Optional[Tuple[int, int, int, int]]:
     """
     先按范围裁剪图片，然后再调用 OCR 识别文字，并将坐标映射回原图。
     
     :param image_path: 图片的路径
     :param target_text: 要查找的文字
-    :param scope: 裁剪范围，'top' / 'center' / 'bottom'
+    :param scope: 裁剪范围，'top' / 'center' / 'bottom' / 'top_left' / 'top_right'
+    :param keep_temp: 是否保留裁剪后的临时图片，True 为保留
     :return: 映射回原图的坐标 (x, y, width, height)
     """
-    if scope not in ['top', 'center', 'bottom']:
+    if scope not in ['top', 'center', 'bottom', 'top_left', 'top_right']:
         return await find_text_in_image(image_path, target_text)
         
     try:
@@ -88,6 +94,10 @@ async def find_text_in_image_with_scope(image_path: str, target_text: str, scope
             
             if scope == 'top':
                 box = (0, 0, width, int(height * 0.2))
+            elif scope == 'top_left':
+                box = (0, 0, int(width * 0.5), int(height * 0.2))
+            elif scope == 'top_right':
+                box = (int(width * 0.5), 0, width, int(height * 0.2))
             elif scope == 'center':
                 box = (0, int(height * 0.2), width, int(height * 0.8))
             elif scope == 'bottom':
@@ -100,8 +110,10 @@ async def find_text_in_image_with_scope(image_path: str, target_text: str, scope
         try:
             coords = await find_text_in_image(temp_path, target_text)
         finally:
-            # 无论识别成功还是失败，都清理掉裁剪的临时图片
-            if os.path.exists(temp_path):
+            # 默认清理临时图片；调试时可保留用于检查
+            if keep_temp and os.path.exists(temp_path):
+                print(f"保留 scope 临时图片: {temp_path}")
+            elif os.path.exists(temp_path):
                 os.remove(temp_path)
                 
         if coords:
@@ -191,7 +203,9 @@ async def main():
             # text_to_find = "×"
             # text_to_find = "领取奖励"
             # text_to_find = "坚持退出"
-            text_to_find = "看视频+"
+            # text_to_find = "看视频+"
+            # text_to_find = "微信提现"
+            text_to_find = "关闭"
             
             print(f"在图片 '{image_path}' 中查找文字: '{text_to_find}'")
             

@@ -90,7 +90,6 @@
     {
       "name": "悟空 - 广告",
       "screen_text": [
-        "广告",
         "关闭"
       ],
       "screen_text_not_include": [
@@ -98,7 +97,8 @@
       ],
       "action": {
         "type": "click_text",
-        "target": "关闭"
+        "target": "关闭",
+        "scope": "top_right"
       }
     },
     {
