@@ -98,8 +98,7 @@
       ],
       "action": {
         "type": "click_text",
-        "target": "关闭",
-        "scope": "top"
+        "target": "关闭"
       }
     },
     {
