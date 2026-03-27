@@ -2,19 +2,30 @@
   "_comment": "悟空浏览器",
   "back_activities": ["com.cat.readall/com.ss.android.newmedia.activity.browser.BrowserActivity"],
   "scenarios": [
+    
     {
-      "name": "进入赚钱界面",
+      "name": "还没到吃饭时间",
+      "scope": "center",
       "screen_text": [
-        "首页",
-        "赚钱"
-      ],
-      "screen_text_not_include": [
-        "微信提现"
+        "还没到吃饭时间",
+        "看视频领"
       ],
       "action": {
         "type": "click_text",
-        "target": "赚钱"
+        "target": "看视频领"
       }
+    },
+    {
+      "name": "限时奖励",
+      "scope": "center",
+      "screen_text": [
+        "获得限时奖励",
+        "看视频领取"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "看视频领取"
+      }  
     },
     {
       "name": "悟空 - 今日签到",
@@ -40,15 +51,15 @@
       }
     },
     {
-      "name": "悟空 - 看视频再得金币",
+      "name": "看视频再得金币",
+      "scope": "center",
       "screen_text": [
         "恭喜您已获得",
         "看视频再得"
       ],
       "action": {
         "type": "click_text",
-        "target": "看视频再得",
-        "scope": "center"
+        "target": "看视频再得"        
       }
     },
     {
@@ -88,7 +99,8 @@
       }
     },
     {
-      "name": "悟空 - 广告",
+      "name": "广告可关闭",
+      "scope": "top_right",
       "screen_text": [
         "关闭"
       ],
@@ -97,8 +109,7 @@
       ],
       "action": {
         "type": "click_text",
-        "target": "关闭",
-        "scope": "top_right"
+        "target": "关闭"        
       }
     },
     {
@@ -112,6 +123,32 @@
         "type": "click_text",
         "target": "继续观看",
         "scope": "center"
+      }
+    },
+    {
+      "name": "看完广告",
+      "scope": "center",
+      "screen_text": [
+        "恭喜你获得",
+        "开心收下"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "开心收下"        
+      }
+    },
+    {
+      "name": "进入赚钱界面",
+      "screen_text": [
+        "首页",
+        "赚钱"
+      ],
+      "screen_text_not_include": [
+        "元到微信"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "赚钱"
       }
     },
     {

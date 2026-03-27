@@ -1,0 +1,15 @@
+{
+  "activity_random_swipe_up": {
+    "enabled": true,
+    "activities": [
+      "com.ss.android.ugc.aweme.lite/com.ss.android.ugc.aweme.splash.SplashActivity"
+    ],
+    "interval_min_seconds": 10,
+    "interval_max_seconds": 15,
+    "start_x": 500,
+    "start_y": 800,
+    "end_x": 500,
+    "end_y": 400,
+    "duration_ms": 50
+  }
+}

@@ -37,6 +37,15 @@ def get_connected_devices(adb_path: str) -> List[str]:
         print(f"执行 adb devices 失败: {e}")
         return []
 
+def get_devices(adb_path: str) -> List[str]:
+    """
+    获取通过 ADB 连接的所有设备的序列号（别名）。
+
+    :param adb_path: adb 可执行文件的路径。
+    :return: 一个包含所有设备序列号的列表。
+    """
+    return get_connected_devices(adb_path)
+
 def get_foreground_app(adb_path: str, device_serial: str) -> str:
     """
     获取指定设备当前前台运行的应用包名。
