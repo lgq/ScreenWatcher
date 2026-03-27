@@ -79,8 +79,8 @@ async def _maybe_activity_random_swipe_up(device_serial: str, current_activity: 
     base_duration_ms = int(swipe_cfg.get('duration_ms', 150))
 
     # 获取随机生成的范围（可选配置）
-    swipe_distance_min = int(swipe_cfg.get('swipe_distance_min', 50))
-    swipe_distance_max = int(swipe_cfg.get('swipe_distance_max', 200))
+    swipe_distance_min = int(swipe_cfg.get('swipe_distance_min', -50))
+    swipe_distance_max = int(swipe_cfg.get('swipe_distance_max', 50))
     x_variance = int(swipe_cfg.get('x_variance', 20))  # 水平方向浮动范围
     duration_min_ms = int(swipe_cfg.get('duration_min_ms', 50))
     duration_max_ms = int(swipe_cfg.get('duration_max_ms', 100))
@@ -90,7 +90,7 @@ async def _maybe_activity_random_swipe_up(device_serial: str, current_activity: 
     actual_start_y = base_start_y
     swipe_distance = random.randint(swipe_distance_min, swipe_distance_max)
     actual_end_x = base_start_x + random.randint(-x_variance, x_variance)
-    actual_end_y = base_start_y - swipe_distance
+    actual_end_y = base_end_y - swipe_distance
     actual_duration_ms = random.randint(duration_min_ms, duration_max_ms)
 
     wait_seconds = random.uniform(interval_min, interval_max)

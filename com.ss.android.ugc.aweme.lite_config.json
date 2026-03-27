@@ -1,4 +1,45 @@
 {
+  "_comment": "抖音极速版",
+  "back_activities": [
+    "com.ss.android.ugc.aweme.lite/com.bytedance.android.sif.container.SifContainerActivity"
+  ],
+  "scenarios": [
+    {
+      "name": "看完广告",
+      "scope": "center",
+      "screen_text": [
+        "恭喜累计共获得奖励",
+        "评价并收下金币"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "评价并收下金币"
+      }
+    },
+    {
+      "name": "再看一个视频额外获得",
+      "scope": "center",
+      "screen_text": [
+        "再看一个视频额外获得",
+        "领取奖励"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "领取奖励"
+      }
+    },
+    {
+      "name": "看完广告",
+      "scope": "top_right",
+      "screen_text": [
+        "领取成功"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "领取成功"
+      }
+    }
+  ],
   "activity_random_swipe_up": {
     "enabled": true,
     "activities": [

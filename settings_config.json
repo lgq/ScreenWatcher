@@ -2,6 +2,6 @@
     "adb_path": "adb",
     "keep_scope_temp_images": false,
     "poll_interval_seconds": 3,
-    "run_duration_minutes": 30,
+    "run_duration_minutes": 60,
     "screenshot_dir": "temp_screenshots"
 }
