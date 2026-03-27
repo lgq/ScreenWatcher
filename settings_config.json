@@ -1,6 +1,26 @@
 {
-  "adb_path": "adb",
-  "poll_interval_seconds": 3,
-  "run_duration_minutes": 30,
-  "screenshot_dir": "temp_screenshots"
+    "adb_path": "adb",
+    "poll_interval_seconds": 3,
+    "run_duration_minutes": 3,
+    "screenshot_dir": "temp_screenshots",
+    "app_loop": [
+        {
+            "device": {
+                "name": "X70",
+                "id": "N0URB50103",
+                "_common1": "红果-17880328860, 红果1 - 18150396132, 红果2 - 13666017801, 红果3 - 18759219521",
+                "_common2": "悟空-17880328860, 悟空1 - 18150396132, 悟空2 - 13666017801, 悟空3 - 18759219521",
+                "test_icon_position_list": [
+                    {"x": 200, "y": 300},
+                    {"x": 500, "y": 300},
+                    {"x": 800, "y": 300},
+                    {"x": 1100, "y": 300},
+                    {"x": 200, "y": 600},
+                    {"x": 500, "y": 600},
+                    {"x": 800, "y": 600},
+                    {"x": 1100, "y": 600}
+                ]
+            }
+        }
+    ]
 }

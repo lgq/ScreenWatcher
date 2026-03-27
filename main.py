@@ -44,7 +44,7 @@ async def process_device(device_serial: str):
         print(f"[{device_serial}] 当前配置中没有可用场景，跳过处理。")
         
     for scenario in scenarios:
-        print(f"[{device_serial}] 正在检查界面: '{scenario['name']}'")
+        # print(f"[{device_serial}] 正在检查界面: '{scenario['name']}'")
         screen_text_config = scenario['screen_text']
         
         # 兼容单个字符串或字符串列表（若是列表，则必须全部包含）
@@ -127,37 +127,62 @@ async def process_device(device_serial: str):
 
 def main_loop():
     """
-    主轮询循环。
+    主循环，按顺序测试在 settings_config.json 中配置的应用。
     """
     if not load_config():
         return
 
-    # 循环设定
-    run_duration_seconds = CONFIG['settings']['run_duration_minutes'] * 60
+    app_loop_config = CONFIG['settings'].get('app_loop', [])
+    if not app_loop_config:
+        print("settings_config.json 中未配置 'app_loop'，程序退出。")
+        return
+
+    adb_path = CONFIG['settings']['adb_path']
     poll_interval = CONFIG['settings']['poll_interval_seconds']
-    start_time = time.time()
+    run_duration_minutes_per_app = CONFIG['settings'].get('run_duration_minutes', 30)
+    run_duration_seconds_per_app = run_duration_minutes_per_app * 60
     
-    print("="*20 + " 屏幕监控开始 " + "="*20)
-    print(f"配置加载成功！将运行 {CONFIG['settings']['run_duration_minutes']} 分钟，每 {poll_interval} 秒轮询一次。")
+    print("="*20 + " 应用顺序监控开始 " + "="*20)
 
-    while time.time() - start_time < run_duration_seconds:
-        adb_path = CONFIG['settings']['adb_path']
-        
-        # 获取连接的设备
-        devices = adb_util.get_connected_devices(adb_path)
-        
-        if not devices:
-            print("未检测到任何设备，等待中...")
-        else:
-            print(f"\n检测到 {len(devices)} 个设备: {devices}")
-            for device in devices:
-                # 对每个设备异步执行处理函数
-                asyncio.run(process_device(device))
-        
-        # 等待下一次轮询
-        time.sleep(poll_interval)
+    for loop_item in app_loop_config:
+        device_info = loop_item.get('device')
+        if not device_info:
+            continue
 
-    print("\n="*20 + " 运行时间结束，程序退出。 " + "="*20)
+        device_id = device_info.get('id')
+        device_name = device_info.get('name', device_id)
+        icon_positions = device_info.get('test_icon_position_list', [])
+
+        if not device_id or not icon_positions:
+            print(f"设备 '{device_name}' 配置不完整 (缺少 id 或 test_icon_position_list)，跳过。")
+            continue
+
+        print(f"\n===== 开始在设备 {device_name} ({device_id}) 上执行测试 =====")
+
+        for i, position in enumerate(icon_positions):
+            x, y = position.get('x'), position.get('y')
+            if x is None or y is None:
+                continue
+
+            print(f"\n--- ({i+1}/{len(icon_positions)}) 启动位于 ({x}, {y}) 的应用，持续 {run_duration_minutes_per_app} 分钟 ---")
+
+            # 1. 返回桌面并点击图标启动应用
+            adb_util.back_home(adb_path, device_id)
+            time.sleep(2)  # 等待桌面稳定
+            adb_util.click(adb_path, device_id, x, y)
+            time.sleep(5)  # 等待应用启动
+
+            # 2. 在指定时间内循环监控
+            start_time = time.time()
+            while time.time() - start_time < run_duration_seconds_per_app:
+                asyncio.run(process_device(device_id))
+                time.sleep(poll_interval)
+            
+            print(f"--- 应用 ({x}, {y}) 测试结束 ---")
+
+        print(f"===== 设备 {device_name} ({device_id}) 所有测试完成 =====")
+
+    print("\n="*20 + " 所有应用测试完成，程序退出。 " + "="*20)
 
 
 if __name__ == "__main__":

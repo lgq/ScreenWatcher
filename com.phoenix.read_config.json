@@ -1,5 +1,20 @@
 {
+  "_comment": "红果免费视频",
   "scenarios": [
+    {
+      "name": "进入福利",
+      "screen_text": [
+        "首页",
+        "福利"
+      ],
+      "screen_text_not_include": [
+        "日常福利"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "福利"
+      }
+    },
     {
       "name": "看视频再领",
       "screen_text": [
