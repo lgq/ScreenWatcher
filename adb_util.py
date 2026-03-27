@@ -4,6 +4,20 @@ import os
 import re
 from typing import List
 
+
+def _extract_activity_component(dumpsys_output: str) -> str:
+    """
+    从 dumpsys 输出中提取前台 activity 组件名，格式为 package/activity。
+
+    :param dumpsys_output: dumpsys 命令输出文本。
+    :return: 组件名（例如 "com.android.settings/.Settings"），未找到则返回空字符串。
+    """
+    # 常见格式示例：
+    # mResumedActivity: ActivityRecord{... u0 com.xxx/.MainActivity t123}
+    # topResumedActivity=ActivityRecord{... com.xxx/com.xxx.MainActivity}
+    match = re.search(r'([a-zA-Z0-9_\.]+/[a-zA-Z0-9_\.$]+)', dumpsys_output)
+    return match.group(1) if match else ""
+
 def get_connected_devices(adb_path: str) -> List[str]:
     """
     获取通过 ADB 连接的所有设备的序列号。
@@ -59,6 +73,45 @@ def get_foreground_app(adb_path: str, device_serial: str) -> str:
         return ""
     except Exception as e:
         print(f"设备 {device_serial} 获取前台应用失败: {e}")
+        return ""
+
+
+def get_current_activity(adb_path: str, device_serial: str) -> str:
+    """
+    获取指定设备当前前台 activity（package/activity）。
+
+    :param adb_path: adb 可执行文件的路径。
+    :param device_serial: 目标设备的序列号。
+    :return: 当前前台 activity（例如 "com.android.settings/.Settings"），获取失败则返回空字符串。
+    """
+    try:
+        # 优先使用 activity dumpsys，稳定性通常优于 window dumpsys。
+        result_activity = subprocess.check_output(
+            [adb_path, "-s", device_serial, "shell", "dumpsys", "activity", "activities"],
+            universal_newlines=True, encoding='utf-8', errors='ignore'
+        )
+
+        for line in result_activity.splitlines():
+            if "mResumedActivity" in line or "ResumedActivity" in line or "topResumedActivity" in line:
+                component = _extract_activity_component(line)
+                if component:
+                    return component
+
+        # 兜底：从 window 当前焦点中提取 activity 组件。
+        result_window = subprocess.check_output(
+            [adb_path, "-s", device_serial, "shell", "dumpsys", "window"],
+            universal_newlines=True, encoding='utf-8', errors='ignore'
+        )
+
+        for line in result_window.splitlines():
+            if "mCurrentFocus" in line and "null" not in line:
+                component = _extract_activity_component(line)
+                if component:
+                    return component
+
+        return ""
+    except Exception as e:
+        print(f"设备 {device_serial} 获取当前 Activity 失败: {e}")
         return ""
 
 def take_screenshot(adb_path: str, device_serial: str, local_path: str) -> bool:
@@ -159,6 +212,19 @@ def back_home(adb_path: str, device_serial: str):
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"在设备 {device_serial} 上返回主屏幕失败: {e}")
 
+def back(adb_path: str, device_serial: str):
+    """
+    模拟按下设备返回键（Back）。
+
+    :param adb_path: adb 可执行文件的路径。
+    :param device_serial: 目标设备的序列号。
+    """
+    try:
+        print(f"在设备 {device_serial} 上按返回键")
+        subprocess.check_call([adb_path, "-s", device_serial, "shell", "input", "keyevent", "4"])
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"在设备 {device_serial} 上按返回键失败: {e}")
+
 
 if __name__ == '__main__':
     # --- 测试代码 ---
@@ -173,6 +239,14 @@ if __name__ == '__main__':
         print(f"检测到设备: {devices}")
         # 选择第一个设备进行测试
         test_device = devices[0]
+
+        # 测试获取当前 Activity
+        print("\n--- 正在测试获取当前 Activity ---")
+        current_activity = get_current_activity(ADB_PATH, test_device)
+        if current_activity:
+            print(f"设备 {test_device} 当前 Activity: {current_activity}")
+        else:
+            print(f"设备 {test_device} 未获取到当前 Activity")
         
         # 测试截图
         print("\n--- 正在测试截图 ---")

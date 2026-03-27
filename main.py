@@ -30,7 +30,16 @@ async def process_device(device_serial: str):
         print(f"[{device_serial}] 无法获取前台应用或处于桌面，回退使用默认 config.json")
         load_config(config_path="config.json")
 
-    # 1. 截图
+    # 1. 若当前 activity 在配置的 back_activities 列表中，执行返回操作并结束
+    back_activities = CONFIG.get('back_activities', [])
+    if back_activities:
+        current_activity = adb_util.get_current_activity(adb_path, device_serial)
+        if current_activity and any(current_activity.endswith(act) or act in current_activity for act in back_activities):
+            print(f"[{device_serial}] 当前 Activity '{current_activity}' 命中 back_activities，执行返回操作。")
+            adb_util.back(adb_path, device_serial)
+            return
+
+    # 2. 截图
     screenshot_dir = CONFIG['settings']['screenshot_dir']
     screenshot_path = os.path.join(screenshot_dir, f"{device_serial}_{int(time.time())}.png")
     
@@ -38,7 +47,7 @@ async def process_device(device_serial: str):
         # 截图失败，跳过此设备
         return
 
-    # 2. 识别界面并执行操作
+    # 3. 识别界面并执行操作
     scenarios = CONFIG.get('scenarios', [])
     if not scenarios:
         print(f"[{device_serial}] 当前配置中没有可用场景，跳过处理。")
@@ -118,7 +127,7 @@ async def process_device(device_serial: str):
     else:
         print(f"[{device_serial}] 未识别到任何已配置的界面。")
     
-    # 3. 清理截图
+    # 4. 清理截图
     try:
         os.remove(screenshot_path)
     except OSError as e:

@@ -2,20 +2,6 @@
   "_comment": "红果免费视频",
   "scenarios": [
     {
-      "name": "进入福利",
-      "screen_text": [
-        "首页",
-        "福利"
-      ],
-      "screen_text_not_include": [
-        "日常福利"
-      ],
-      "action": {
-        "type": "click_text",
-        "target": "福利"
-      }
-    },
-    {
       "name": "看视频再领",
       "screen_text": [
         "恭喜你获得",
@@ -38,6 +24,29 @@
       "action": {
         "type": "click_text",
         "target": "立即领取"
+      }
+    },
+    {
+      "name": "签到领金币",
+      "screen_text": [
+        "恭喜获得开宝箱奖励",
+        "看视频最高再领"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "看视频最高再领"
+      }
+    },
+    {
+      "name": "签到领金币",
+      "screen_text": [
+        "恭喜你获得追剧奖励",
+        "直接领取",
+        "看视频领"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "看视频领"
       }
     },
     {
@@ -131,6 +140,20 @@
       "action": {
         "type": "click_text",
         "target": "开心收下"
+      }
+    },
+    {
+      "name": "进入福利",
+      "screen_text": [
+        "首页",
+        "福利"
+      ],
+      "screen_text_not_include": [
+        "日常福利"
+      ],
+      "action": {
+        "type": "click_text",
+        "target": "福利"
       }
     }
   ]

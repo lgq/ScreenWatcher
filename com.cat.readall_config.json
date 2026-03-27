@@ -1,5 +1,6 @@
 {
   "_comment": "悟空浏览器",
+  "back_activities": ["com.cat.readall/com.ss.android.newmedia.activity.browser.BrowserActivity"],
   "scenarios": [
     {
       "name": "进入赚钱界面",
