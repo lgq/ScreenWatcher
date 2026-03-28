@@ -17,6 +17,20 @@ datas = []
 binaries = []
 hiddenimports = []
 
+
+def safe_collect_data_files(module_name: str):
+    try:
+        return collect_data_files(module_name)
+    except Exception:
+        return []
+
+
+def safe_collect_submodules(module_name: str):
+    try:
+        return collect_submodules(module_name)
+    except Exception:
+        return []
+
 if os.path.isdir(DEFAULTS_ROOT):
     datas.append((DEFAULTS_ROOT, "defaults"))
 
@@ -24,10 +38,28 @@ if os.path.isdir(PLATFORM_TOOLS_ROOT):
     datas.append((PLATFORM_TOOLS_ROOT, "platform-tools"))
 
 # WinRT OCR 和 Pillow 需要显式收集子模块/数据，避免打包后运行时报缺模块。
-datas += collect_data_files("PIL")
-datas += collect_data_files("winrt")
+datas += safe_collect_data_files("PIL")
+datas += safe_collect_data_files("winrt")
 hiddenimports += collect_submodules("PIL")
-hiddenimports += collect_submodules("winrt")
+hiddenimports += safe_collect_submodules("winrt")
+hiddenimports += safe_collect_submodules("winrt.windows.foundation")
+hiddenimports += safe_collect_submodules("winrt.windows.storage")
+hiddenimports += safe_collect_submodules("winrt.windows.graphics")
+hiddenimports += safe_collect_submodules("winrt.windows.media")
+hiddenimports += [
+    "winrt",
+    "winrt.system",
+    "winrt.windows",
+    "winrt.windows.foundation",
+    "winrt.windows.foundation.collections",
+    "winrt.windows.globalization",
+    "winrt.windows.graphics",
+    "winrt.windows.graphics.imaging",
+    "winrt.windows.media",
+    "winrt.windows.media.ocr",
+    "winrt.windows.storage",
+    "winrt.windows.storage.streams",
+]
 
 
 a = Analysis(

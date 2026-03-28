@@ -22,9 +22,20 @@ def get_user_data_dir() -> str:
 
 def get_defaults_root() -> str:
     app_root = get_app_root()
-    packaged_defaults = os.path.join(app_root, "defaults")
-    if os.path.isdir(packaged_defaults):
-        return packaged_defaults
+
+    candidates = [
+        os.path.join(app_root, "defaults"),
+        os.path.join(app_root, "_internal", "defaults"),
+    ]
+
+    meipass = getattr(sys, "_MEIPASS", "")
+    if meipass:
+        candidates.append(os.path.join(meipass, "defaults"))
+
+    for path in candidates:
+        if os.path.isdir(path):
+            return path
+
     return app_root
 
 
@@ -44,9 +55,10 @@ def ensure_runtime_layout() -> str:
 def get_default_files() -> List[str]:
     defaults_root = get_defaults_root()
     files = ["settings_config.json", "config.json"]
-    for name in os.listdir(defaults_root):
-        if name.endswith("_config.json") and name not in files:
-            files.append(name)
+    if os.path.isdir(defaults_root):
+        for name in os.listdir(defaults_root):
+            if name.endswith("_config.json") and name not in files:
+                files.append(name)
     return files
 
 
@@ -73,11 +85,42 @@ def sync_default_runtime_files() -> str:
                 if not os.path.exists(target):
                     shutil.copy2(source, target)
 
+    # 兜底：若打包资源缺失，仍生成最小可运行 settings，避免启动即报“配置文件不存在”。
+    settings_path = os.path.join(data_root, "settings_config.json")
+    if not os.path.exists(settings_path):
+        with open(settings_path, "w", encoding="utf-8") as f:
+            f.write(
+                '{\n'
+                '  "adb_path": "adb",\n'
+                '  "adb_wifi_devices": [],\n'
+                '  "keep_scope_temp_images": false,\n'
+                '  "poll_interval_seconds": 3,\n'
+                '  "run_duration_minutes": 60,\n'
+                '  "screenshot_dir": "temp_screenshots"\n'
+                '}\n'
+            )
+
+    config_path = os.path.join(data_root, "config.json")
+    if not os.path.exists(config_path):
+        with open(config_path, "w", encoding="utf-8") as f:
+            f.write('{\n  "scenarios": []\n}\n')
+
     return data_root
 
 
 def get_bundled_adb_path() -> str:
-    candidate = os.path.join(get_app_root(), "platform-tools", "adb.exe")
-    if os.path.isfile(candidate):
-        return candidate
+    app_root = get_app_root()
+    candidates = [
+        os.path.join(app_root, "platform-tools", "adb.exe"),
+        os.path.join(app_root, "_internal", "platform-tools", "adb.exe"),
+    ]
+
+    meipass = getattr(sys, "_MEIPASS", "")
+    if meipass:
+        candidates.append(os.path.join(meipass, "platform-tools", "adb.exe"))
+
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+
     return ""

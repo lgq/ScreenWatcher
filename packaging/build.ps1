@@ -118,7 +118,19 @@ function Ensure-BuildDependencies {
 
     Write-Host "Installing build dependencies..."
     Invoke-Python -PythonInfo $PythonInfo -Arguments @("-m", "pip", "install", "--upgrade", "pip")
-    Invoke-Python -PythonInfo $PythonInfo -Arguments @("-m", "pip", "install", "pyinstaller")
+    Invoke-Python -PythonInfo $PythonInfo -Arguments @(
+        "-m", "pip", "install",
+        "pyinstaller",
+        "pillow",
+        "winrt-runtime",
+        "winrt-Windows.Foundation",
+        "winrt-Windows.Foundation.Collections",
+        "winrt-Windows.Globalization",
+        "winrt-Windows.Graphics.Imaging",
+        "winrt-Windows.Media.Ocr",
+        "winrt-Windows.Storage",
+        "winrt-Windows.Storage.Streams"
+    )
 }
 
 function Build-PyInstaller {
