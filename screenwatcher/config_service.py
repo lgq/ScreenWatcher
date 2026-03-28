@@ -2,6 +2,8 @@ import json
 import os
 from typing import Any, Dict, List, Tuple
 
+from screenwatcher import runtime_paths
+
 
 class ConfigError(Exception):
     pass
@@ -9,8 +11,15 @@ class ConfigError(Exception):
 
 class ConfigService:
     def __init__(self, base_config_path: str = "config.json", settings_path: str = "settings_config.json"):
-        self.base_config_path = base_config_path
-        self.settings_path = settings_path
+        data_root = runtime_paths.sync_default_runtime_files()
+        self.data_root = data_root
+        self.base_config_path = self._resolve_runtime_path(base_config_path)
+        self.settings_path = self._resolve_runtime_path(settings_path)
+
+    def _resolve_runtime_path(self, path: str) -> str:
+        if os.path.isabs(path):
+            return path
+        return os.path.join(self.data_root, path)
 
     def _read_json(self, path: str) -> Dict[str, Any]:
         try:
@@ -22,7 +31,11 @@ class ConfigService:
             raise ConfigError(f"配置文件解析失败: {path}: {exc}") from exc
 
     def _normalize_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
-        settings["adb_path"] = str(settings.get("adb_path", "adb"))
+        adb_path = str(settings.get("adb_path", "adb")).strip() or "adb"
+        bundled_adb_path = runtime_paths.get_bundled_adb_path()
+        if adb_path == "adb" and bundled_adb_path:
+            adb_path = bundled_adb_path
+        settings["adb_path"] = adb_path
         settings["keep_scope_temp_images"] = bool(settings.get("keep_scope_temp_images", False))
 
         poll_interval = settings.get("poll_interval_seconds", 3)
@@ -30,7 +43,9 @@ class ConfigService:
         settings["poll_interval_seconds"] = max(1, self._to_int(poll_interval, 3))
         settings["run_duration_minutes"] = max(1, self._to_int(run_duration, 30))
 
-        screenshot_dir = settings.get("screenshot_dir", "temp_screenshots")
+        screenshot_dir = str(settings.get("screenshot_dir", "temp_screenshots")).strip() or "temp_screenshots"
+        if not os.path.isabs(screenshot_dir):
+            screenshot_dir = os.path.join(self.data_root, screenshot_dir)
         if not os.path.exists(screenshot_dir):
             os.makedirs(screenshot_dir)
         settings["screenshot_dir"] = screenshot_dir
@@ -245,7 +260,7 @@ class ConfigService:
 
     def resolve_runtime_config_path(self, package_name: str = "") -> str:
         if package_name:
-            app_config_path = f"{package_name}_config.json"
+            app_config_path = self._resolve_runtime_path(f"{package_name}_config.json")
             if os.path.exists(app_config_path):
                 return app_config_path
         return self.base_config_path

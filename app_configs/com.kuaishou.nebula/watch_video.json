@@ -1,0 +1,40 @@
+{
+  "feature_name": "刷视频",
+  "entry": {
+    "from_desktop": true,
+    "wait_after_home_seconds": 2,
+    "launch_path": [
+      {
+        "type": "launch_app",
+        "package": "com.kuaishou.nebula"
+      },
+      {
+        "type": "wait",
+        "seconds": 5
+      }
+    ],
+    "wait_after_launch_seconds": 2
+  },
+  "monitor": {
+    "duration_minutes": 30,
+    "poll_interval_seconds": 3,
+    "activity_random_swipe_up": {
+      "enabled": true,
+      "activities": [
+        "com.kuaishou.nebula/com.yxcorp.gifshow.HomeActivity"
+      ],
+      "interval_min_seconds": 10,
+      "interval_max_seconds": 15,
+      "start_x": 500,
+      "start_y": 900,
+      "end_x": 500,
+      "end_y": 660,
+      "x_variance": 20,
+      "start_y_variance": 12,
+      "end_y_variance": 18,
+      "duration_min_ms": 100,
+      "duration_max_ms": 180
+    },
+    "scenarios": []
+  }
+}
