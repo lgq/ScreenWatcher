@@ -5,6 +5,49 @@ import re
 from typing import Dict, List
 
 
+def _extract_host(serial_or_host: str) -> str:
+    value = str(serial_or_host).strip()
+    if not value:
+        return ""
+    if ":" in value:
+        return value.split(":", 1)[0].strip()
+    return value
+
+
+def _discover_wifi_serial_by_host(adb_path: str, host: str) -> str:
+    """
+    通过 `adb mdns services` 尝试发现指定 host 当前可用的无线调试端口。
+
+    :param adb_path: adb 可执行文件路径。
+    :param host: 设备 IP 或主机名。
+    :return: 发现到的 serial（host:port），未发现返回空字符串。
+    """
+    if not host:
+        return ""
+
+    try:
+        output = subprocess.check_output(
+            [adb_path, "mdns", "services"],
+            universal_newlines=True,
+            encoding="utf-8",
+            errors="ignore",
+            timeout=3,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return ""
+
+    for line in output.splitlines():
+        if host not in line:
+            continue
+        match = re.search(r"([a-zA-Z0-9._-]+):(\d+)", line)
+        if match:
+            discovered_host = match.group(1)
+            discovered_port = match.group(2)
+            if discovered_host == host:
+                return f"{discovered_host}:{discovered_port}"
+    return ""
+
+
 def _extract_activity_component(dumpsys_output: str) -> str:
     """
     从 dumpsys 输出中提取前台 activity 组件名，格式为 package/activity。
@@ -75,12 +118,26 @@ def ensure_wifi_devices_connected(adb_path: str, wifi_devices: List[Dict[str, ob
     :param adb_path: adb 可执行文件的路径。
     :param wifi_devices: 设备配置列表，每项至少包含 serial。
     """
+    connected_devices = set(get_connected_devices(adb_path))
+
     for item in wifi_devices:
         serial = str(item.get("serial", "")).strip()
         auto_connect = bool(item.get("auto_connect", True))
         if not serial or not auto_connect:
             continue
-        connect_wifi_device(adb_path, serial)
+
+        if serial in connected_devices:
+            continue
+
+        if connect_wifi_device(adb_path, serial):
+            continue
+
+        # 原端口失败后，尝试按 host 自动发现新端口再连接。
+        host = _extract_host(serial)
+        discovered_serial = _discover_wifi_serial_by_host(adb_path, host)
+        if discovered_serial and discovered_serial != serial:
+            print(f"ADB Wi-Fi 发现端口变化: {serial} -> {discovered_serial}")
+            connect_wifi_device(adb_path, discovered_serial)
 
 def get_devices(adb_path: str) -> List[str]:
     """

@@ -1,8 +1,8 @@
 {
     "adb_path": "adb",
     "adb_wifi_devices": [
-        "192.168.0.115:38007",
-        "192.168.0.112:35515"
+        "192.168.0.130:43089",
+        "192.168.0.131:39395"
     ],
     "keep_scope_temp_images": false,
     "poll_interval_seconds": 3,
