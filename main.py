@@ -10,7 +10,6 @@ async def main():
     config_service = ConfigService()
     try:
         config_service.load_settings()
-        config_service.load_runtime_config()
     except ConfigError as exc:
         print(f"配置加载失败，程序退出。原因: {exc}")
         return
@@ -20,4 +19,7 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n[系统] 已收到中断信号，程序退出。")

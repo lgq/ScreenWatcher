@@ -1,4 +1,8 @@
 __pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
 screenshots/
 temp_screenshots/
 ocr_report.json
