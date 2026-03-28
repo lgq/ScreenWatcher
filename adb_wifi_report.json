@@ -1,0 +1,12 @@
+[
+  {
+    "serial": "192.168.0.115:38007",
+    "connect_success": true,
+    "listed_after_connect": true,
+    "foreground_app": "com.android.settings",
+    "current_activity": "com.android.settings/.SubSettings",
+    "screenshot_success": true,
+    "screenshot_path": "wifi_test_screenshots\\192.168.0.115_38007_1774660658.png",
+    "error": ""
+  }
+]

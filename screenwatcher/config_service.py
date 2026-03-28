@@ -35,8 +35,40 @@ class ConfigService:
             os.makedirs(screenshot_dir)
         settings["screenshot_dir"] = screenshot_dir
 
+        settings["adb_wifi_devices"] = self._normalize_adb_wifi_devices(settings.get("adb_wifi_devices", []))
         settings["app_loop"] = self._normalize_app_loop(settings.get("app_loop", []))
         return settings
+
+    def _normalize_adb_wifi_devices(self, adb_wifi_devices: Any) -> List[Dict[str, Any]]:
+        if not isinstance(adb_wifi_devices, list):
+            return []
+
+        normalized_devices: List[Dict[str, Any]] = []
+        for item in adb_wifi_devices:
+            serial = ""
+            auto_connect = True
+
+            if isinstance(item, str):
+                serial = item.strip()
+            elif isinstance(item, dict):
+                host = str(item.get("host", "")).strip()
+                port = self._to_int(item.get("port", 5555), 5555)
+                serial = str(item.get("serial", "")).strip() or (f"{host}:{port}" if host else "")
+                auto_connect = bool(item.get("auto_connect", True))
+            else:
+                continue
+
+            if not serial or ":" not in serial:
+                continue
+
+            normalized_devices.append(
+                {
+                    "serial": serial,
+                    "auto_connect": auto_connect,
+                }
+            )
+
+        return normalized_devices
 
     def _normalize_app_loop(self, app_loop: Any) -> List[Dict[str, Any]]:
         if not isinstance(app_loop, list):

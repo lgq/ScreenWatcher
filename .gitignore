@@ -2,8 +2,3 @@ __pycache__/
 screenshots/
 temp_screenshots/
 ocr_report.json
-__pycache__/adb_util.cpython-314.pyc
-__pycache__/adb_util.cpython-314.pyc
-__pycache__/config_manager.cpython-314.pyc
-__pycache__/main.cpython-314.pyc
-__pycache__/util.cpython-314.pyc

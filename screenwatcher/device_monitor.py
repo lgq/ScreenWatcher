@@ -65,6 +65,7 @@ class DeviceMonitor:
                 settings = self._get_settings()
                 adb_path = settings["adb_path"]
                 poll_interval = settings["poll_interval_seconds"]
+                adb_util.ensure_wifi_devices_connected(adb_path, settings.get("adb_wifi_devices", []))
                 devices = adb_util.get_devices(adb_path)
                 if device_id not in devices:
                     print(f"[{device_id}] 设备已断开连接，停止监控")
@@ -92,6 +93,7 @@ class DeviceMonitor:
                     last_check_time = current_time
                     settings = self._get_settings()
                     adb_path = settings["adb_path"]
+                    adb_util.ensure_wifi_devices_connected(adb_path, settings.get("adb_wifi_devices", []))
 
                     try:
                         connected_devices = adb_util.get_devices(adb_path)

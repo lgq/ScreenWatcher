@@ -128,6 +128,7 @@ async def main() -> None:
 
     _ensure_dir(output_dir)
 
+    adb_util.ensure_wifi_devices_connected(adb_path, settings.get("adb_wifi_devices", []))
     devices = adb_util.get_connected_devices(adb_path)
     if not devices:
         print("No connected devices found.")

@@ -2,7 +2,7 @@
 import subprocess
 import os
 import re
-from typing import List
+from typing import Dict, List
 
 
 def _extract_activity_component(dumpsys_output: str) -> str:
@@ -36,6 +36,47 @@ def get_connected_devices(adb_path: str) -> List[str]:
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"执行 adb devices 失败: {e}")
         return []
+
+
+def connect_wifi_device(adb_path: str, serial: str) -> bool:
+    """
+    连接一个通过 Wi-Fi 调试的 ADB 设备。
+
+    :param adb_path: adb 可执行文件的路径。
+    :param serial: 设备地址，格式为 host:port。
+    :return: 成功或已连接返回 True，否则返回 False。
+    """
+    try:
+        result = subprocess.check_output(
+            [adb_path, "connect", serial],
+            universal_newlines=True,
+            encoding="utf-8",
+            errors="ignore",
+        )
+        normalized = result.lower()
+        if "connected to" in normalized or "already connected to" in normalized:
+            print(f"ADB Wi-Fi 连接成功: {serial}")
+            return True
+        print(f"ADB Wi-Fi 连接结果异常: {serial}: {result.strip()}")
+        return False
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"ADB Wi-Fi 连接失败 {serial}: {e}")
+        return False
+
+
+def ensure_wifi_devices_connected(adb_path: str, wifi_devices: List[Dict[str, object]]) -> None:
+    """
+    尝试连接配置中的 Wi-Fi 调试设备。
+
+    :param adb_path: adb 可执行文件的路径。
+    :param wifi_devices: 设备配置列表，每项至少包含 serial。
+    """
+    for item in wifi_devices:
+        serial = str(item.get("serial", "")).strip()
+        auto_connect = bool(item.get("auto_connect", True))
+        if not serial or not auto_connect:
+            continue
+        connect_wifi_device(adb_path, serial)
 
 def get_devices(adb_path: str) -> List[str]:
     """
