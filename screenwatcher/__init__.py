@@ -1,0 +1,1 @@
+"""ScreenWatcher core package."""

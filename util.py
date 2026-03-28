@@ -1,7 +1,5 @@
 
-import asyncio
 import os
-import time
 from typing import Optional, Tuple, List, Dict, Any
 
 from winrt.windows.globalization import Language
@@ -9,9 +7,6 @@ from winrt.windows.graphics.imaging import BitmapDecoder
 from winrt.windows.media.ocr import OcrEngine
 from winrt.windows.storage import StorageFile, FileAccessMode
 from PIL import Image
-
-import adb_util
-from config_manager import CONFIG, load_config
 
 
 async def find_text_in_image(image_path: str, target_text: str) -> Optional[Tuple[int, int, int, int]]:
@@ -174,65 +169,3 @@ async def get_all_text_from_image(image_path: str) -> List[Dict[str, Any]]:
         print(f"处理图片时发生错误: {e}")
 
     return []
-
-
-async def main():
-    """测试函数"""
-    if not load_config():
-        return
-    
-    adb_path_str = CONFIG['settings']['adb_path']
-    # 获取连接的设备
-    devices = adb_util.get_connected_devices(adb_path_str)
-        
-    if not devices:
-        print("未检测到任何设备，等待中...")
-    else:
-        print(f"\n检测到 {len(devices)} 个设备: {devices}")
-        for device_serial in devices:
-
-            screenshot_dir = CONFIG['settings']['screenshot_dir']
-            screenshot_path = os.path.join(screenshot_dir, f"{device_serial}_{int(time.time())}.png")
-            if not adb_util.take_screenshot(CONFIG['settings']['adb_path'], device_serial, screenshot_path):
-                # 截图失败，跳过此设备
-                return
-
-            image_path = screenshot_path
-            # text_to_find = "允许"
-            # text_to_find = "设置"
-            # text_to_find = "×"
-            # text_to_find = "领取奖励"
-            # text_to_find = "坚持退出"
-            # text_to_find = "看视频+"
-            # text_to_find = "微信提现"
-            text_to_find = "关闭"
-            
-            print(f"在图片 '{image_path}' 中查找文字: '{text_to_find}'")
-            
-            coordinates = await find_text_in_image(image_path, text_to_find)
-            
-            if coordinates:
-                x, y, w, h = coordinates
-                # center_x = x + w / 2
-                center_x = x + w -10 # 尝试点击文字右侧一点的位置，避免点击到文字本身可能较小的区域
-                center_y = y + h / 2
-                print(f"找到了！")
-                print(f"  > 坐标: [x:{x}, y:{y}, w:{w}, h:{h}]")
-                print(f"  > 中心点: ({center_x:.1f}, {center_y:.1f})")
-                
-                # adb_util.click(CONFIG['settings']['adb_path'], device_serial, center_x, center_y)
-            else:
-                print("没有找到指定的文字。")
-                
-            print("\n--- 测试获取所有文字 ---")
-            all_texts = await get_all_text_from_image(image_path)
-            if all_texts:
-                print(f"共识别到 {len(all_texts)} 行文字：")
-                for item in all_texts:
-                    print(f"  > 文本: '{item['text']}', 坐标: {item['box']}")
-            else:
-                print("未能识别到任何文字或图片不存在。")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

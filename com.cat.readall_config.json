@@ -1,8 +1,9 @@
 {
   "_comment": "悟空浏览器",
-  "back_activities": ["com.cat.readall/com.ss.android.newmedia.activity.browser.BrowserActivity"],
+  "back_activities": [
+    "com.cat.readall/com.ss.android.newmedia.activity.browser.BrowserActivity"
+  ],
   "scenarios": [
-    
     {
       "name": "还没到吃饭时间",
       "scope": "center",
@@ -25,7 +26,7 @@
       "action": {
         "type": "click_text",
         "target": "看视频领取"
-      }  
+      }
     },
     {
       "name": "悟空 - 今日签到",
@@ -59,7 +60,7 @@
       ],
       "action": {
         "type": "click_text",
-        "target": "看视频再得"        
+        "target": "看视频再得"
       }
     },
     {
@@ -109,7 +110,7 @@
       ],
       "action": {
         "type": "click_text",
-        "target": "关闭"        
+        "target": "关闭"
       }
     },
     {
@@ -134,7 +135,7 @@
       ],
       "action": {
         "type": "click_text",
-        "target": "开心收下"        
+        "target": "开心收下"
       }
     },
     {
