@@ -549,3 +549,92 @@ python test_adb_wifi.py
 python test_adb_wifi.py --cleanup
 python test_adb_wifi.py --output-dir wifi_test_screenshots --save-json adb_wifi_report.json
 ```
+
+## 11. 打包与安装包构建
+
+本项目已提供完整打包流水线，可在 Windows 上生成：
+
+1. 目录包（PyInstaller 输出）
+2. 安装包（Inno Setup 输出 .exe）
+
+### 11.1 前置条件
+
+1. Windows 环境
+2. 可用的 Python（建议使用项目 `.venv`）
+3. 已安装 Inno Setup 6（需有 `ISCC.exe`）
+
+说明：
+
+- `build.ps1` 会自动安装/更新 PyInstaller
+- 若本地没有 `platform-tools/adb.exe`，脚本会自动下载 Android platform-tools
+
+### 11.2 一键构建命令
+
+在项目根目录执行：
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\packaging\build.ps1 -Version 1.0.0
+```
+
+### 11.3 可选参数
+
+- `-Version 1.0.0`
+  - 设置安装包版本号（会体现在安装包文件名中）
+
+- `-SkipInstaller`
+  - 仅构建目录包，不生成安装包
+
+- `-SkipPlatformToolsDownload`
+  - 跳过 platform-tools 自动下载（要求你已在项目中准备好可用 adb）
+
+示例：
+
+```powershell
+# 只生成目录包
+.\packaging\build.ps1 -Version 1.0.0 -SkipInstaller
+
+# 不下载 platform-tools（离线构建）
+.\packaging\build.ps1 -Version 1.0.0 -SkipPlatformToolsDownload
+```
+
+### 11.4 构建产物位置
+
+- PyInstaller 目录包：`dist/ScreenWatcher`
+- 安装包：`packaging/output/ScreenWatcher-Setup-<Version>.exe`
+
+### 11.5 运行时目录说明（安装后）
+
+安装包采用 per-user 安装策略，默认安装到：
+
+- `{localappdata}\Programs\ScreenWatcher`
+
+程序运行时会使用用户数据目录：
+
+- `%LOCALAPPDATA%\ScreenWatcher`
+
+该目录下会保存：
+
+- `settings_config.json`
+- `config.json`
+- `app_configs/`
+- `temp_screenshots/`
+
+默认行为会保留用户数据（便于升级后保留配置）；卸载时仅在勾选清理用户数据选项时才删除。
+
+### 11.6 常见问题
+
+1. 提示 `ISCC.exe was not found`
+
+- 说明未安装 Inno Setup 或路径未被识别
+- 安装 Inno Setup 6 后重试
+
+2. 能生成目录包，不能生成安装包
+
+- 通常是 Inno Setup 阶段失败
+- 先用 `-SkipInstaller` 验证 PyInstaller 是否正常
+
+3. 目标机启动后 OCR 无法工作
+
+- 目标机需安装对应 OCR 语言包（如 `zh-Hans-CN`）
+- 这是系统能力依赖，不是打包失败

@@ -135,6 +135,8 @@ function Find-ISCC {
     }
 
     foreach ($candidate in @(
+        "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+        "$env:LOCALAPPDATA\Microsoft\WinGet\Links\ISCC.exe",
         "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
         "C:\Program Files\Inno Setup 6\ISCC.exe"
     )) {

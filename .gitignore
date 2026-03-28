@@ -6,3 +6,6 @@ __pycache__/
 screenshots/
 temp_screenshots/
 ocr_report.json
+build/
+dist/
+packaging/output/
