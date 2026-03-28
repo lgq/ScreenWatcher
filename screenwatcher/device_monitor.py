@@ -65,7 +65,6 @@ class DeviceMonitor:
                 settings = self._get_settings()
                 adb_path = settings["adb_path"]
                 poll_interval = settings["poll_interval_seconds"]
-                adb_util.ensure_wifi_devices_connected(adb_path, settings.get("adb_wifi_devices", []))
                 devices = adb_util.get_devices(adb_path)
                 if device_id not in devices:
                     print(f"[{device_id}] 设备已断开连接，停止监控")
@@ -77,6 +76,21 @@ class DeviceMonitor:
                 print(f"[{device_id}] 监控过程中出错: {exc}")
                 await asyncio.sleep(self._get_settings().get("poll_interval_seconds", 3))
 
+    async def _wifi_reconnect_loop(self) -> None:
+        """后台任务：定期重连 WiFi 设备，通过线程池执行，不阻塞事件循环。"""
+        loop = asyncio.get_event_loop()
+        while True:
+            settings = self._get_settings()
+            wifi_devices = settings.get("adb_wifi_devices", [])
+            if wifi_devices:
+                await loop.run_in_executor(
+                    None,
+                    adb_util.ensure_wifi_devices_connected,
+                    settings["adb_path"],
+                    wifi_devices,
+                )
+            await asyncio.sleep(30)
+
     async def run(self) -> None:
         device_tasks: Dict[str, asyncio.Task] = {}
         last_check_time = time.time()
@@ -86,6 +100,10 @@ class DeviceMonitor:
         print(" 多设备动态监控开始（支持热插拔设备） ")
         print("=" * 50)
 
+        settings = self._get_settings()
+        if settings.get("adb_wifi_devices"):
+            asyncio.create_task(self._wifi_reconnect_loop())
+
         try:
             while True:
                 current_time = time.time()
@@ -93,7 +111,6 @@ class DeviceMonitor:
                     last_check_time = current_time
                     settings = self._get_settings()
                     adb_path = settings["adb_path"]
-                    adb_util.ensure_wifi_devices_connected(adb_path, settings.get("adb_wifi_devices", []))
 
                     try:
                         connected_devices = adb_util.get_devices(adb_path)

@@ -52,12 +52,16 @@ def connect_wifi_device(adb_path: str, serial: str) -> bool:
             universal_newlines=True,
             encoding="utf-8",
             errors="ignore",
+            timeout=5,
         )
         normalized = result.lower()
         if "connected to" in normalized or "already connected to" in normalized:
             print(f"ADB Wi-Fi 连接成功: {serial}")
             return True
         print(f"ADB Wi-Fi 连接结果异常: {serial}: {result.strip()}")
+        return False
+    except subprocess.TimeoutExpired:
+        print(f"ADB Wi-Fi 连接超时: {serial}")
         return False
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"ADB Wi-Fi 连接失败 {serial}: {e}")
