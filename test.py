@@ -68,7 +68,8 @@ async def _ocr_device(
     max_lines: int,
 ) -> Dict[str, Any]:
     timestamp = int(time.time())
-    screenshot_path = os.path.join(output_dir, f"{device_id}_{timestamp}.png")
+    safe_device_id = device_id.replace(":", "_")
+    screenshot_path = os.path.join(output_dir, f"{safe_device_id}_{timestamp}.png")
 
     result: Dict[str, Any] = {
         "device": device_id,

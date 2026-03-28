@@ -45,7 +45,8 @@ class DeviceProcessor:
             self._cleanup_screenshot(screenshot_path)
 
     def _build_screenshot_path(self, screenshot_dir: str, device_serial: str) -> str:
-        return os.path.join(screenshot_dir, f"{device_serial}_{int(time.time())}.png")
+        safe_serial = device_serial.replace(":", "_")
+        return os.path.join(screenshot_dir, f"{safe_serial}_{int(time.time())}.png")
 
     def _cleanup_screenshot(self, screenshot_path: str) -> None:
         try:
