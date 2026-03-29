@@ -14,6 +14,10 @@ def get_app_root() -> str:
 
 
 def get_user_data_dir() -> str:
+    # 安装包运行时直接使用安装目录下的配置与运行数据。
+    if getattr(sys, "frozen", False):
+        return get_app_root()
+
     local_app_data = os.environ.get("LOCALAPPDATA")
     if local_app_data:
         return os.path.join(local_app_data, APP_NAME)

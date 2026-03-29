@@ -55,6 +55,7 @@ def _ensure_dir(path: str) -> None:
 def _test_wifi_device(adb_path: str, serial: str, output_dir: str, cleanup: bool) -> Dict[str, Any]:
     result: Dict[str, Any] = {
         "serial": serial,
+        "resolved_serial": "",
         "connect_success": False,
         "listed_after_connect": False,
         "foreground_app": "",
@@ -64,27 +65,29 @@ def _test_wifi_device(adb_path: str, serial: str, output_dir: str, cleanup: bool
         "error": "",
     }
 
-    connect_success = adb_util.connect_wifi_device(adb_path, serial)
-    result["connect_success"] = connect_success
+    resolved_serial = adb_util.connect_wifi_device_with_recovery(adb_path, serial)
+    result["resolved_serial"] = resolved_serial
+    result["connect_success"] = bool(resolved_serial)
 
     connected_devices = adb_util.get_connected_devices(adb_path)
-    result["listed_after_connect"] = serial in connected_devices
+    active_serial = resolved_serial or serial
+    result["listed_after_connect"] = active_serial in connected_devices
 
-    if not connect_success and not result["listed_after_connect"]:
+    if not result["connect_success"] and not result["listed_after_connect"]:
         result["error"] = "connect_failed"
         return result
 
     try:
-        result["foreground_app"] = adb_util.get_foreground_app(adb_path, serial)
-        result["current_activity"] = adb_util.get_current_activity(adb_path, serial)
+        result["foreground_app"] = adb_util.get_foreground_app(adb_path, active_serial)
+        result["current_activity"] = adb_util.get_current_activity(adb_path, active_serial)
     except Exception as exc:
         result["error"] = f"device_query_failed: {exc}"
 
     timestamp = int(time.time())
-    screenshot_path = os.path.join(output_dir, f"{serial.replace(':', '_')}_{timestamp}.png")
+    screenshot_path = os.path.join(output_dir, f"{active_serial.replace(':', '_')}_{timestamp}.png")
     result["screenshot_path"] = screenshot_path
 
-    screenshot_success = adb_util.take_screenshot(adb_path, serial, screenshot_path)
+    screenshot_success = adb_util.take_screenshot(adb_path, active_serial, screenshot_path)
     result["screenshot_success"] = screenshot_success
 
     if screenshot_success and cleanup and os.path.exists(screenshot_path):

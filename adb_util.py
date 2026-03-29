@@ -2,7 +2,8 @@
 import subprocess
 import os
 import re
-from typing import Dict, List
+import time
+from typing import Dict, List, Optional
 
 
 def _extract_host(serial_or_host: str) -> str:
@@ -36,16 +37,82 @@ def _discover_wifi_serial_by_host(adb_path: str, host: str) -> str:
     except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
         return ""
 
+    host_lower = host.lower()
     for line in output.splitlines():
-        if host not in line:
+        if host_lower not in line.lower():
             continue
         match = re.search(r"([a-zA-Z0-9._-]+):(\d+)", line)
         if match:
             discovered_host = match.group(1)
             discovered_port = match.group(2)
-            if discovered_host == host:
+            # mDNS 输出中 host 大小写可能变化，这里采用大小写不敏感匹配。
+            if discovered_host.lower() == host_lower:
                 return f"{discovered_host}:{discovered_port}"
     return ""
+
+
+def _run_adb_command(adb_path: str, args: List[str], timeout: int = 5) -> str:
+    try:
+        return subprocess.check_output(
+            [adb_path, *args],
+            universal_newlines=True,
+            encoding="utf-8",
+            errors="ignore",
+            timeout=timeout,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return ""
+
+
+def _disconnect_wifi_target(adb_path: str, target: str) -> None:
+    if not target:
+        return
+    _run_adb_command(adb_path, ["disconnect", target], timeout=4)
+
+
+def _refresh_wifi_serial(adb_path: str, serial: str, retries: int = 3, interval_seconds: float = 0.6) -> str:
+    host = _extract_host(serial)
+    if not host:
+        return ""
+
+    for attempt in range(retries):
+        discovered_serial = _discover_wifi_serial_by_host(adb_path, host)
+        if discovered_serial:
+            return discovered_serial
+        if attempt < retries - 1:
+            time.sleep(interval_seconds)
+    return ""
+
+
+def _connect_wifi_with_recovery(adb_path: str, serial: str) -> Optional[str]:
+    if connect_wifi_device(adb_path, serial):
+        return serial
+
+    # 端口漂移时先清理旧连接，避免 adb 保留失效 endpoint 影响重连。
+    _disconnect_wifi_target(adb_path, serial)
+    host = _extract_host(serial)
+    _disconnect_wifi_target(adb_path, host)
+
+    discovered_serial = _refresh_wifi_serial(adb_path, serial)
+    if not discovered_serial:
+        return None
+
+    if discovered_serial != serial:
+        print(f"ADB Wi-Fi 发现端口变化: {serial} -> {discovered_serial}")
+    _disconnect_wifi_target(adb_path, discovered_serial)
+
+    if connect_wifi_device(adb_path, discovered_serial):
+        return discovered_serial
+
+    # 端口刚切换后可能存在短暂窗口，等待后再次发现并重试一次。
+    latest_serial = _refresh_wifi_serial(adb_path, serial, retries=2, interval_seconds=1.0)
+    if latest_serial and latest_serial != discovered_serial:
+        print(f"ADB Wi-Fi 再次发现端口变化: {discovered_serial} -> {latest_serial}")
+        _disconnect_wifi_target(adb_path, latest_serial)
+        if connect_wifi_device(adb_path, latest_serial):
+            return latest_serial
+
+    return None
 
 
 def _extract_activity_component(dumpsys_output: str) -> str:
@@ -111,6 +178,14 @@ def connect_wifi_device(adb_path: str, serial: str) -> bool:
         return False
 
 
+def connect_wifi_device_with_recovery(adb_path: str, serial: str) -> str:
+    """
+    连接 Wi-Fi 设备并在端口变化时自动恢复。返回最终可用 serial，失败返回空字符串。
+    """
+    resolved_serial = _connect_wifi_with_recovery(adb_path, serial)
+    return resolved_serial or ""
+
+
 def ensure_wifi_devices_connected(adb_path: str, wifi_devices: List[Dict[str, object]]) -> None:
     """
     尝试连接配置中的 Wi-Fi 调试设备。
@@ -129,15 +204,9 @@ def ensure_wifi_devices_connected(adb_path: str, wifi_devices: List[Dict[str, ob
         if serial in connected_devices:
             continue
 
-        if connect_wifi_device(adb_path, serial):
-            continue
-
-        # 原端口失败后，尝试按 host 自动发现新端口再连接。
-        host = _extract_host(serial)
-        discovered_serial = _discover_wifi_serial_by_host(adb_path, host)
-        if discovered_serial and discovered_serial != serial:
-            print(f"ADB Wi-Fi 发现端口变化: {serial} -> {discovered_serial}")
-            connect_wifi_device(adb_path, discovered_serial)
+        resolved_serial = connect_wifi_device_with_recovery(adb_path, serial)
+        if resolved_serial:
+            connected_devices.add(resolved_serial)
 
 def get_devices(adb_path: str) -> List[str]:
     """

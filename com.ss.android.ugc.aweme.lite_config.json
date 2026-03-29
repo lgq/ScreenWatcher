@@ -1,7 +1,8 @@
 {
   "_comment": "抖音极速版",
   "back_activities": [
-    "com.ss.android.ugc.aweme.lite/com.bytedance.android.sif.container.SifContainerActivity"
+    "com.ss.android.ugc.aweme.lite/com.bytedance.android.sif.container.SifContainerActivity",
+    "com.ss.android.ugc.aweme.lite/com.ss.android.ugc.aweme.live.LivePlayActivity"
   ],
   "scenarios": [
     {
