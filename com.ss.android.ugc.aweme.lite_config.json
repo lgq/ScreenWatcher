@@ -52,6 +52,6 @@
     "start_y": 800,
     "end_x": 500,
     "end_y": 400,
-    "duration_ms": 50
+    "duration_ms": 150
   }
 }
