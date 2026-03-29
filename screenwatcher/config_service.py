@@ -1,5 +1,6 @@
 import json
 import os
+import socket
 from typing import Any, Dict, List, Tuple
 
 from screenwatcher import runtime_paths
@@ -11,6 +12,7 @@ class ConfigError(Exception):
 
 class ConfigService:
     def __init__(self, base_config_path: str = "config.json", settings_path: str = "settings_config.json"):
+        # 启动时先确保运行目录和默认配置已经准备好，后续所有读写都基于该目录展开。
         data_root = runtime_paths.sync_default_runtime_files()
         self.data_root = data_root
         self.base_config_path = self._resolve_runtime_path(base_config_path)
@@ -33,6 +35,7 @@ class ConfigService:
     def _normalize_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
         adb_path = str(settings.get("adb_path", "adb")).strip() or "adb"
         bundled_adb_path = runtime_paths.get_bundled_adb_path()
+        # 当用户没有显式指定 adb 路径时，优先使用安装包内自带 adb，减少环境依赖。
         if adb_path == "adb" and bundled_adb_path:
             adb_path = bundled_adb_path
         settings["adb_path"] = adb_path
@@ -52,7 +55,31 @@ class ConfigService:
 
         settings["adb_wifi_devices"] = self._normalize_adb_wifi_devices(settings.get("adb_wifi_devices", []))
         settings["app_loop"] = self._normalize_app_loop(settings.get("app_loop", []))
+        settings["remote_control"] = self._normalize_remote_control(settings.get("remote_control", {}))
         return settings
+
+    def _normalize_remote_control(self, value: Any) -> Dict[str, Any]:
+        config = value if isinstance(value, dict) else {}
+        # 默认用主机名生成 device_id/device_name，避免首启时因为未配置而无法注册到服务端。
+        default_device_id = socket.gethostname().strip() or "screenwatcher-pc"
+        device_id = str(config.get("device_id", default_device_id)).strip() or default_device_id
+        device_name = str(config.get("device_name", device_id)).strip() or device_id
+
+        return {
+            "enabled": bool(config.get("enabled", False)),
+            "supabase_url": str(config.get("supabase_url", "")).strip().rstrip("/"),
+            "supabase_key": str(config.get("supabase_key", "")).strip(),
+            "access_token": str(config.get("access_token", "")).strip(),
+            "project_id": str(config.get("project_id", "screenwatcher-prod")).strip() or "screenwatcher-prod",
+            "device_id": device_id,
+            "device_name": device_name,
+            "config_poll_seconds": max(5, self._to_int(config.get("config_poll_seconds", 10), 10)),
+            "status_upload_seconds": max(5, self._to_int(config.get("status_upload_seconds", 10), 10)),
+            # 表名也纳入配置，便于后续做测试环境/正式环境隔离。
+            "config_table": str(config.get("config_table", "watch_config_versions")).strip() or "watch_config_versions",
+            "device_table": str(config.get("device_table", "watch_devices")).strip() or "watch_devices",
+            "status_table": str(config.get("status_table", "watch_device_status_logs")).strip() or "watch_device_status_logs",
+        }
 
     def _normalize_adb_wifi_devices(self, adb_wifi_devices: Any) -> List[Dict[str, Any]]:
         if not isinstance(adb_wifi_devices, list):

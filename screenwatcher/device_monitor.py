@@ -6,12 +6,19 @@ import adb_util
 
 from screenwatcher.config_service import ConfigService
 from screenwatcher.device_processor import DeviceProcessor
+from screenwatcher.remote_sync import RemoteControlService
 
 
 class DeviceMonitor:
-    def __init__(self, config_service: ConfigService, device_processor: DeviceProcessor):
+    def __init__(
+        self,
+        config_service: ConfigService,
+        device_processor: DeviceProcessor,
+        remote_control_service: Optional[RemoteControlService] = None,
+    ):
         self.config_service = config_service
         self.device_processor = device_processor
+        self.remote_control_service = remote_control_service
 
     def _get_settings(self) -> Dict[str, Any]:
         return self.config_service.load_settings()
@@ -91,10 +98,36 @@ class DeviceMonitor:
                 )
             await asyncio.sleep(30)
 
+    async def _remote_sync_loop(self, device_tasks: Dict[str, asyncio.Task]) -> None:
+        if not self.remote_control_service:
+            return
+
+        loop = asyncio.get_event_loop()
+        while True:
+            settings = self._get_settings()
+            remote_settings = settings.get("remote_control", {})
+            interval = min(
+                remote_settings.get("config_poll_seconds", 10),
+                remote_settings.get("status_upload_seconds", 10),
+            )
+            # 只把仍在运行的设备任务传给远控服务，便于服务端看到当前活跃监控集合。
+            active_monitor_devices = [
+                device_id for device_id, task in device_tasks.items() if task and not task.done()
+            ]
+            await loop.run_in_executor(None, self.remote_control_service.run_cycle, active_monitor_devices)
+            await asyncio.sleep(interval)
+
+    def _cancel_all_device_tasks(self, device_tasks: Dict[str, asyncio.Task]) -> None:
+        for task in device_tasks.values():
+            if task and not task.done():
+                task.cancel()
+        device_tasks.clear()
+
     async def run(self) -> None:
         device_tasks: Dict[str, asyncio.Task] = {}
         last_check_time = time.time()
         check_interval = 5
+        was_paused = False
 
         print("=" * 50)
         print(" 多设备动态监控开始（支持热插拔设备） ")
@@ -103,6 +136,8 @@ class DeviceMonitor:
         settings = self._get_settings()
         if settings.get("adb_wifi_devices"):
             asyncio.create_task(self._wifi_reconnect_loop())
+        if self.remote_control_service:
+            asyncio.create_task(self._remote_sync_loop(device_tasks))
 
         try:
             while True:
@@ -111,6 +146,18 @@ class DeviceMonitor:
                     last_check_time = current_time
                     settings = self._get_settings()
                     adb_path = settings["adb_path"]
+
+                    if self.remote_control_service and self.remote_control_service.get_monitor_state() == "paused":
+                        if not was_paused:
+                            print("[系统] 远程控制要求暂停监控，正在停止所有设备任务")
+                            was_paused = True
+                        # paused 状态下不再维持已有监控任务，保证远程暂停能快速生效。
+                        self._cancel_all_device_tasks(device_tasks)
+                        await asyncio.sleep(check_interval)
+                        continue
+                    if was_paused:
+                        print("[系统] 远程控制恢复为运行状态，重新开始设备监控")
+                        was_paused = False
 
                     try:
                         connected_devices = adb_util.get_devices(adb_path)
@@ -147,6 +194,4 @@ class DeviceMonitor:
             print("\n\n" + "=" * 50)
             print(" 监控已停止（用户中断） ")
             print("=" * 50)
-            for task in device_tasks.values():
-                if task and not task.done():
-                    task.cancel()
+            self._cancel_all_device_tasks(device_tasks)

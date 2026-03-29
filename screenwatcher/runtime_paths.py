@@ -36,6 +36,7 @@ def get_defaults_root() -> str:
     if meipass:
         candidates.append(os.path.join(meipass, "defaults"))
 
+    # 兼容开发态目录、PyInstaller onedir 和运行时临时解包目录三种布局。
     for path in candidates:
         if os.path.isdir(path):
             return path
@@ -53,7 +54,17 @@ def ensure_runtime_layout() -> str:
     ensure_directory(os.path.join(data_root, "app_configs"))
     ensure_directory(os.path.join(data_root, "temp_screenshots"))
     ensure_directory(os.path.join(data_root, "wifi_test_screenshots"))
+    # 远控配置下发前先准备好备份目录，方便后续按 revision 留存快照。
+    ensure_directory(os.path.join(data_root, "backups"))
     return data_root
+
+
+def get_runtime_file_path(file_name: str) -> str:
+    return os.path.join(ensure_runtime_layout(), file_name)
+
+
+def get_runtime_backup_dir() -> str:
+    return ensure_directory(os.path.join(ensure_runtime_layout(), "backups"))
 
 
 def get_default_files() -> List[str]:
@@ -73,6 +84,7 @@ def sync_default_runtime_files() -> str:
     for name in get_default_files():
         source = os.path.join(defaults_root, name)
         target = os.path.join(data_root, name)
+        # 只在目标文件不存在时拷贝，避免默认模板覆盖用户已经调整过的本地配置。
         if os.path.isfile(source) and not os.path.exists(target):
             shutil.copy2(source, target)
 
@@ -86,6 +98,7 @@ def sync_default_runtime_files() -> str:
             for file_name in files:
                 source = os.path.join(root, file_name)
                 target = os.path.join(target_root, file_name)
+                # app_configs 也遵循“只补缺失，不主动覆盖”的原则。
                 if not os.path.exists(target):
                     shutil.copy2(source, target)
 

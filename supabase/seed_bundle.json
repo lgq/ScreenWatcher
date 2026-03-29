@@ -1,0 +1,636 @@
+{
+  "protocol": {
+    "schema_version": 1,
+    "project_id": "screenwatcher-prod",
+    "revision": 1,
+    "created_at": "2026-03-29T02:37:55Z",
+    "author": "admin",
+    "hash": "sha256:d9dc4179869a255752063f447ac03811019f68079ac514b6074f6abf46e1d500",
+    "effective_mode": "immediate",
+    "min_client_version": "1.0.6"
+  },
+  "control": {
+    "enabled": true,
+    "monitor_state": "running",
+    "poll_interval_seconds": 10,
+    "status_upload_interval_seconds": 10
+  },
+  "settings_config": {
+    "adb_path": "adb",
+    "adb_wifi_devices": [
+      "192.168.0.130:43089",
+      "192.168.0.131:39395"
+    ],
+    "keep_scope_temp_images": false,
+    "poll_interval_seconds": 3,
+    "run_duration_minutes": 60,
+    "screenshot_dir": "temp_screenshots"
+  },
+  "config_json": {
+    "scenarios": [
+      {
+        "name": "看视频再领",
+        "screen_text": [
+          "恭喜你获得",
+          "现金收益",
+          "看视频再领"
+        ],
+        "action": {
+          "type": "click_text",
+          "target": "看视频再领"
+        }
+      },
+      {
+        "name": "看短剧赚金币",
+        "screen_text": [
+          "金币收益",
+          "现金收益",
+          "看短剧赚金币",
+          "立即领取"
+        ],
+        "action": {
+          "type": "click_text",
+          "target": "立即领取"
+        }
+      },
+      {
+        "name": "签到领金币",
+        "screen_text": [
+          "金币收益",
+          "现金收益",
+          "签到领金币",
+          "去签到"
+        ],
+        "action": {
+          "type": "click_text",
+          "target": "去签到"
+        }
+      },
+      {
+        "name": "今日签到",
+        "screen_text": [
+          "今日签到领",
+          "立即签到"
+        ],
+        "action": {
+          "type": "click_text",
+          "target": "立即签到"
+        }
+      },
+      {
+        "name": "今日签到",
+        "screen_text": [
+          "今日签到",
+          "已连续签到",
+          "立即签到"
+        ],
+        "action": {
+          "type": "click_text",
+          "target": "立即签到"
+        }
+      },
+      {
+        "name": "今日签到",
+        "screen_text": [
+          "签到成功",
+          "已连续签到",
+          "看视频最高再领"
+        ],
+        "action": {
+          "type": "click_text",
+          "target": "看视频最高再领"
+        }
+      },
+      {
+        "name": "退出今日签到",
+        "screen_text": [
+          "明日签到领",
+          "明日签到可领"
+        ],
+        "action": {
+          "type": "click_coords",
+          "x": 633,
+          "y": 2067
+        }
+      },
+      {
+        "name": "领取奖励",
+        "screen_text": [
+          "坚持退出",
+          "领取奖励"
+        ],
+        "action": {
+          "type": "click_text",
+          "target": "领取奖励"
+        }
+      },
+      {
+        "name": "领取成功 X",
+        "screen_text": [
+          "广告",
+          "领取成功",
+          "×"
+        ],
+        "action": {
+          "type": "click_text",
+          "target": "×"
+        }
+      },
+      {
+        "name": "看完所有广告",
+        "screen_text": [
+          "恭喜你已累计获得奖励"
+        ],
+        "action": {
+          "type": "click_text",
+          "target": "开心收下"
+        }
+      }
+    ]
+  },
+  "app_configs": {
+    "com.cat.readall": {
+      "_comment": "悟空浏览器",
+      "back_activities": [
+        "com.cat.readall/com.ss.android.newmedia.activity.browser.BrowserActivity"
+      ],
+      "scenarios": [
+        {
+          "name": "还没到吃饭时间",
+          "scope": "center",
+          "screen_text": [
+            "还没到吃饭时间",
+            "看视频领"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "看视频领"
+          }
+        },
+        {
+          "name": "限时奖励",
+          "scope": "center",
+          "screen_text": [
+            "获得限时奖励",
+            "看视频领取"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "看视频领取"
+          }
+        },
+        {
+          "name": "悟空 - 今日签到",
+          "screen_text": [
+            "今日签到领",
+            "立即领取"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "立即领取"
+          }
+        },
+        {
+          "name": "悟空 - 看视频+金币",
+          "screen_text": [
+            "明日签到",
+            "已连续签到",
+            "看视频+"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "看视频+"
+          }
+        },
+        {
+          "name": "看视频再得金币",
+          "scope": "center",
+          "screen_text": [
+            "恭喜您已获得",
+            "看视频再得"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "看视频再得"
+          }
+        },
+        {
+          "name": "悟空 - 看视频再得金币",
+          "screen_text": [
+            "恭喜获得惊喜奖励",
+            "看视频再领"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "看视频再领",
+            "scope": "center"
+          }
+        },
+        {
+          "name": "悟空 - 看视频再得金币",
+          "screen_text": [
+            "恭喜获得奖励",
+            "看视频再领"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "看视频再领",
+            "scope": "center"
+          }
+        },
+        {
+          "name": "悟空 - 看视频再得金币",
+          "screen_text": [
+            "恭喜你获得",
+            "看视频再领"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "看视频再领",
+            "scope": "center"
+          }
+        },
+        {
+          "name": "广告可关闭",
+          "scope": "top_right",
+          "screen_text": [
+            "关闭"
+          ],
+          "screen_text_not_include": [
+            "s"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "关闭"
+          }
+        },
+        {
+          "name": "悟空 - 广告",
+          "screen_text": [
+            "秒可领奖励",
+            "继续观看",
+            "坚持退出"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "继续观看",
+            "scope": "center"
+          }
+        },
+        {
+          "name": "看完广告",
+          "scope": "center",
+          "screen_text": [
+            "恭喜你获得",
+            "开心收下"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "开心收下"
+          }
+        },
+        {
+          "name": "进入赚钱界面",
+          "screen_text": [
+            "首页",
+            "赚钱"
+          ],
+          "screen_text_not_include": [
+            "元到微信"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "赚钱"
+          }
+        },
+        {
+          "name": "悟空 - 看短剧上滑跳过广告",
+          "screen_text": [
+            "上滑继续观看短剧"
+          ],
+          "action": {
+            "type": "swipe",
+            "start_x": 500,
+            "start_y": 1500,
+            "end_x": 500,
+            "end_y": 500,
+            "duration_ms": 200
+          }
+        }
+      ]
+    },
+    "com.kuaishou.nebula": {
+      "_comment": "快手极速版",
+      "back_activities": [
+        "com.kuaishou.nebula/com.yxcorp.gifshow.ad.webview.AdYodaActivity",
+        "com.kuaishou.nebula/com.yxcorp.gifshow.detail.PhotoDetailActivity"
+      ],
+      "scenarios": [
+        {
+          "name": "任务中心 - 看广告",
+          "screen_text": [
+            "任务中心",
+            "看广告得金币"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "看广告得金币"
+          }
+        },
+        {
+          "name": "看完广告",
+          "scope": "center",
+          "screen_text": [
+            "再看1个广告",
+            "奖励"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "奖励"
+          }
+        },
+        {
+          "name": "看完广告",
+          "scope": "center",
+          "screen_text": [
+            "再看一个再领",
+            "领取奖励"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "领取奖励"
+          }
+        },
+        {
+          "name": "再看一个视频额外获得",
+          "scope": "center",
+          "screen_text": [
+            "额外",
+            "领取额外金币"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "领取额外金币"
+          }
+        },
+        {
+          "name": "签到去看视频",
+          "scope": "center",
+          "screen_text": [
+            "签到可领",
+            "去看视频"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "去看视频"
+          }
+        },
+        {
+          "name": "看完广告",
+          "scope": "top_left",
+          "screen_text": [
+            "功领取"
+          ],
+          "action": {
+            "type": "swipe",
+            "start_x": 0,
+            "start_y": 208,
+            "end_x": 308,
+            "end_y": 202,
+            "duration_ms": 150
+          }
+        }
+      ],
+      "activity_random_swipe_up": {
+        "enabled": false,
+        "activities": [
+          "com.kuaishou.nebula/com.yxcorp.gifshow.HomeActivity"
+        ],
+        "interval_min_seconds": 10,
+        "interval_max_seconds": 15,
+        "start_x": 500,
+        "start_y": 808,
+        "end_x": 500,
+        "end_y": 400,
+        "duration_ms": 200
+      }
+    },
+    "com.phoenix.read": {
+      "_comment": "红果免费视频",
+      "scenarios": [
+        {
+          "name": "看视频再领",
+          "screen_text": [
+            "恭喜你获得",
+            "现金收益",
+            "看视频再领"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "看视频再领"
+          }
+        },
+        {
+          "name": "看短剧赚金币",
+          "screen_text": [
+            "金币收益",
+            "现金收益",
+            "看短剧赚金币",
+            "立即领取"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "立即领取"
+          }
+        },
+        {
+          "name": "签到领金币",
+          "screen_text": [
+            "恭喜获得开宝箱奖励",
+            "看视频最高再领"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "看视频最高再领"
+          }
+        },
+        {
+          "name": "签到领金币",
+          "screen_text": [
+            "恭喜你获得追剧奖励",
+            "直接领取",
+            "看视频领"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "看视频领"
+          }
+        },
+        {
+          "name": "签到领金币",
+          "screen_text": [
+            "金币收益",
+            "现金收益",
+            "签到领金币",
+            "去签到"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "去签到"
+          }
+        },
+        {
+          "name": "今日签到",
+          "screen_text": [
+            "今日签到领",
+            "立即签到"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "立即签到"
+          }
+        },
+        {
+          "name": "今日签到",
+          "screen_text": [
+            "今日签到",
+            "已连续签到",
+            "立即签到"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "立即签到"
+          }
+        },
+        {
+          "name": "今日签到",
+          "screen_text": [
+            "签到成功",
+            "已连续签到",
+            "看视频最高再领"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "看视频最高再领"
+          }
+        },
+        {
+          "name": "退出今日签到",
+          "screen_text": [
+            "明日签到领",
+            "明日签到可领"
+          ],
+          "action": {
+            "type": "click_coords",
+            "x": 633,
+            "y": 2067
+          }
+        },
+        {
+          "name": "领取奖励",
+          "screen_text": [
+            "坚持退出",
+            "领取奖励"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "领取奖励"
+          }
+        },
+        {
+          "name": "领取成功 X",
+          "screen_text": [
+            "广告",
+            "领取成功",
+            "×"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "×"
+          }
+        },
+        {
+          "name": "看完所有广告",
+          "screen_text": [
+            "恭喜你已累计获得奖励"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "开心收下"
+          }
+        },
+        {
+          "name": "进入福利",
+          "screen_text": [
+            "首页",
+            "福利"
+          ],
+          "screen_text_not_include": [
+            "日常福利"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "福利"
+          }
+        }
+      ]
+    },
+    "com.ss.android.ugc.aweme.lite": {
+      "_comment": "抖音极速版",
+      "back_activities": [
+        "com.ss.android.ugc.aweme.lite/com.bytedance.android.sif.container.SifContainerActivity",
+        "com.ss.android.ugc.aweme.lite/com.ss.android.ugc.aweme.live.LivePlayActivity"
+      ],
+      "scenarios": [
+        {
+          "name": "看完广告",
+          "scope": "center",
+          "screen_text": [
+            "恭喜累计共获得奖励",
+            "评价并收下金币"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "评价并收下金币"
+          }
+        },
+        {
+          "name": "再看一个视频额外获得",
+          "scope": "center",
+          "screen_text": [
+            "再看一个视频额外获得",
+            "领取奖励"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "领取奖励"
+          }
+        },
+        {
+          "name": "看完广告",
+          "scope": "top_right",
+          "screen_text": [
+            "领取成功"
+          ],
+          "action": {
+            "type": "click_text",
+            "target": "领取成功"
+          }
+        }
+      ],
+      "activity_random_swipe_up": {
+        "enabled": true,
+        "activities": [
+          "com.ss.android.ugc.aweme.lite/com.ss.android.ugc.aweme.splash.SplashActivity"
+        ],
+        "interval_min_seconds": 10,
+        "interval_max_seconds": 15,
+        "start_x": 500,
+        "start_y": 800,
+        "end_x": 500,
+        "end_y": 400,
+        "duration_ms": 50
+      }
+    }
+  }
+}

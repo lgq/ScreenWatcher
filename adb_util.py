@@ -294,6 +294,86 @@ def get_current_activity(adb_path: str, device_serial: str) -> str:
         print(f"设备 {device_serial} 获取当前 Activity 失败: {e}")
         return ""
 
+
+def get_device_battery_info(adb_path: str, device_serial: str) -> Dict[str, object]:
+    """
+    获取设备电池信息。
+    """
+    info: Dict[str, object] = {
+        "level": -1,
+        "scale": 100,
+        "charging": False,
+        "status": "unknown",
+    }
+    try:
+        result = subprocess.check_output(
+            [adb_path, "-s", device_serial, "shell", "dumpsys", "battery"],
+            universal_newlines=True,
+            encoding="utf-8",
+            errors="ignore",
+        )
+    except Exception as exc:
+        print(f"设备 {device_serial} 获取电池信息失败: {exc}")
+        return info
+
+    status_map = {
+        "1": "unknown",
+        "2": "charging",
+        "3": "discharging",
+        "4": "not_charging",
+        "5": "full",
+    }
+
+    for line in result.splitlines():
+        if ":" not in line:
+            continue
+        key, raw_value = [part.strip() for part in line.split(":", 1)]
+        if key == "level":
+            try:
+                info["level"] = int(raw_value)
+            except ValueError:
+                pass
+        elif key == "scale":
+            try:
+                info["scale"] = int(raw_value)
+            except ValueError:
+                pass
+        elif key == "status":
+            info["status"] = status_map.get(raw_value, raw_value)
+        # 一些设备 status 不稳定，但会正确标记供电来源，因此这里额外兜底 charging。
+        elif key in {"AC powered", "USB powered", "Wireless powered", "Dock powered"} and raw_value.lower() == "true":
+            info["charging"] = True
+
+    if info["status"] in {"charging", "full"}:
+        info["charging"] = True
+    return info
+
+
+def is_device_screen_on(adb_path: str, device_serial: str) -> bool:
+    """
+    获取设备屏幕是否点亮。
+    """
+    try:
+        result = subprocess.check_output(
+            [adb_path, "-s", device_serial, "shell", "dumpsys", "power"],
+            universal_newlines=True,
+            encoding="utf-8",
+            errors="ignore",
+        )
+    except Exception as exc:
+        print(f"设备 {device_serial} 获取屏幕状态失败: {exc}")
+        return False
+
+    lowered = result.lower()
+    # 不同 Android 版本的 dumpsys power 字段并不一致，因此使用多种特征联合判断。
+    if "display power: state=on" in lowered:
+        return True
+    if "mholdingdisplaysuspendblocker=true" in lowered:
+        return True
+    if "mwakefulness=awake" in lowered:
+        return True
+    return False
+
 def take_screenshot(adb_path: str, device_serial: str, local_path: str) -> bool:
     """
     使用 ADB 从指定设备截屏并保存到本地。

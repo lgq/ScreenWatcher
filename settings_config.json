@@ -4,6 +4,20 @@
         "192.168.0.130:43089",
         "192.168.0.131:39395"
     ],
+    "remote_control": {
+        "enabled": false,
+        "supabase_url": "",
+        "supabase_key": "",
+        "access_token": "",
+        "project_id": "screenwatcher-prod",
+        "device_id": "",
+        "device_name": "",
+        "config_poll_seconds": 10,
+        "status_upload_seconds": 10,
+        "config_table": "watch_config_versions",
+        "device_table": "watch_devices",
+        "status_table": "watch_device_status_logs"
+    },
     "keep_scope_temp_images": false,
     "poll_interval_seconds": 3,
     "run_duration_minutes": 60,
