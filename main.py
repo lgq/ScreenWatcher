@@ -1,5 +1,21 @@
 
 import asyncio
+import builtins
+from datetime import datetime
+
+_original_print = builtins.print
+
+
+def _timestamped_print(*args, **kwargs):
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    # 若首个参数以 \n 开头，保留换行在时间戳之前，避免时间戳被挤到行尾
+    if args and isinstance(args[0], str) and args[0].startswith("\n"):
+        _original_print(f"\n[{timestamp}]", args[0][1:], *args[1:], **kwargs)
+    else:
+        _original_print(f"[{timestamp}]", *args, **kwargs)
+
+
+builtins.print = _timestamped_print
 
 from screenwatcher.config_service import ConfigError, ConfigService
 from screenwatcher.device_monitor import DeviceMonitor

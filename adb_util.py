@@ -392,11 +392,15 @@ def take_screenshot(adb_path: str, device_serial: str, local_path: str) -> bool:
         except subprocess.CalledProcessError:
             # 若该设备不支持此参数，回退到默认的截屏命令
             subprocess.check_call([adb_path, "-s", device_serial, "shell", "screencap", device_path])
-        # 将截图文件拉取到本地
-        subprocess.check_call([adb_path, "-s", device_serial, "pull", device_path, local_path])
+        # 将截图文件拉取到本地（静默执行，避免 adb pull 进度日志污染控制台）
+        subprocess.check_call(
+            [adb_path, "-s", device_serial, "pull", device_path, local_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
         # 删除设备上的临时截图文件
         subprocess.check_call([adb_path, "-s", device_serial, "shell", "rm", device_path])
-        print(f"设备 {device_serial} 截图已保存至: {local_path}")
+        # print(f"设备 {device_serial} 截图已保存至: {local_path}")
         return True
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"设备 {device_serial} 截图失败: {e}")
