@@ -1,7 +1,8 @@
 {
   "_comment": "悟空浏览器",
   "back_activities": [
-    "com.cat.readall/com.ss.android.newmedia.activity.browser.BrowserActivity"
+    "com.cat.readall/com.ss.android.newmedia.activity.browser.BrowserActivity",
+    "com.cat.readall/com.bytedance.android.openlive.plugin.LivePlayerActivity"
   ],
   "scenarios": [
     {
