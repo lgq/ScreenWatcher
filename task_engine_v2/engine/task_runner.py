@@ -1,0 +1,445 @@
+from __future__ import annotations
+
+from datetime import datetime
+from pathlib import Path
+import logging
+import time
+
+from .adb_client import ADBClient
+from .actions import ActionExecutor
+from .matcher import find_first_matching_scenario
+from .models import TaskConfig
+from .ocr_engine import OCRBox, OCREngine
+
+
+logger = logging.getLogger(__name__)
+
+
+class TaskRunner:
+    def __init__(self, device_id: str, task: TaskConfig, adb_path: str = "adb") -> None:
+        self.device_id = device_id
+        self.task = task
+        self.adb = ADBClient(device_id=device_id, adb_path=adb_path)
+        self.ocr = OCREngine()
+        self.action_executor = ActionExecutor(self.adb, self.ocr, screenshot_dir=task.execute.screenshot_dir)
+
+    def run(self) -> None:
+        logger.info("task start | device=%s | task=%s", self.device_id, self.task.name)
+        screen_ok = self.adb.ensure_screen_on()
+        logger.info("task start ensure screen on | device=%s | ok=%s", self.device_id, screen_ok)
+        if not self._run_entry():
+            logger.error("task exit because entry failed | device=%s | task=%s", self.device_id, self.task.name)
+            self._exit_to_home("entry_failed")
+            return
+
+        started = time.monotonic()
+        screenshot_dir = Path(self.task.execute.screenshot_dir) / self.device_id.replace(":", "_")
+        screenshot_dir.mkdir(parents=True, exist_ok=True)
+
+        while True:
+            elapsed = int(time.monotonic() - started)
+            if elapsed >= self.task.exit.max_duration_seconds:
+                logger.info("task exit by duration | device=%s | task=%s", self.device_id, self.task.name)
+                self._exit_to_home("duration")
+                return
+
+            img_name = datetime.now().strftime("%Y%m%d_%H%M%S_%f") + ".png"
+            img_path = screenshot_dir / img_name
+
+            if not self.adb.capture_screenshot(img_path):
+                logger.error("screenshot failed | device=%s | task=%s", self.device_id, self.task.name)
+                self._sleep_poll()
+                continue
+
+            current_activity = self.adb.current_activity()
+            required = self.task.execute.required_activities
+            if required and current_activity not in required:
+                logger.error(
+                    "activity mismatch | device=%s | current=%s | expected=%s",
+                    self.device_id,
+                    current_activity,
+                    required,
+                )
+                back_ok = self.adb.press_back()
+                logger.info("activity mismatch back | device=%s | ok=%s", self.device_id, back_ok)
+                self._sleep_poll()
+                continue
+
+            # Scenario matching keeps line-level OCR for better recall.
+            boxes = self.ocr.extract_text_boxes(img_path)
+            screen_size = self._get_image_size(img_path)
+            scenario = find_first_matching_scenario(self.task.execute.scenarios, boxes, screen_size=screen_size)
+
+            if scenario is None:
+                logger.info("no scenario matched | device=%s", self.device_id)
+                self._sleep_poll()
+                continue
+
+            action_type = str(scenario.action.get("type", ""))
+            if action_type == "click_text":
+                # Click prefers word-level boxes, then falls back to line-level boxes.
+                word_boxes = self.ocr.extract_word_boxes(img_path)
+                ok = self.action_executor.execute(scenario.action, ocr_boxes=word_boxes, screen_size=screen_size)
+                if not ok:
+                    logger.info("scenario click_text fallback to line OCR | device=%s", self.device_id)
+                    ok = self.action_executor.execute(scenario.action, ocr_boxes=boxes, screen_size=screen_size)
+            else:
+                ok = self.action_executor.execute(scenario.action, ocr_boxes=boxes, screen_size=screen_size)
+            logger.info(
+                "scenario matched | device=%s | scenario=%s | action=%s | ok=%s",
+                self.device_id,
+                scenario.name,
+                action_type,
+                ok,
+            )
+
+            if scenario.stop_task or action_type in self.task.exit.stop_on_action_types:
+                logger.info("task exit by action | device=%s | action=%s", self.device_id, action_type)
+                self._exit_to_home("action")
+                return
+
+            self._sleep_poll()
+
+    def _run_entry(self) -> bool:
+        if self.task.entry.start_from_home:
+            self.adb.press_home()
+            time.sleep(1)
+
+        launch = self.task.entry.launch
+        if launch:
+            ok = self.action_executor.execute(
+                {
+                    "type": "launch_app",
+                    "package": launch.get("package", ""),
+                    "activity": launch.get("activity", ""),
+                }
+            )
+            logger.info("entry launch_app | device=%s | ok=%s", self.device_id, ok)
+            if not ok:
+                return False
+            time.sleep(float(launch.get("wait_seconds", 3)))
+
+        for idx, step in enumerate(self.task.entry.steps, start=1):
+            ok = self._run_entry_step_with_retry(step=step, step_index=idx, max_retries=5)
+            if not ok:
+                logger.error(
+                    "entry step failed after retries | device=%s | step=%s | type=%s",
+                    self.device_id,
+                    idx,
+                    step.get("type", ""),
+                )
+                return False
+        return True
+
+    def _run_entry_step_with_retry(self, step: dict, step_index: int, max_retries: int) -> bool:
+        step_type = str(step.get("type", ""))
+        target = str(step.get("target", "")).strip()
+        scope = str(step.get("scope", "full"))
+        ocr_mode = str(step.get("ocr_mode", "line")).strip().lower()
+        # logger.info(target and f"entry step | device=%s | step=%s | type=%s | target=%s" or f"entry step | device=%s | step=%s | type=%s", self.device_id, step_index, step_type, target)
+
+        for attempt in range(1, max_retries + 1):
+            before_boxes, screen_size = self._capture_ocr_for_entry(
+                step_index=step_index,
+                attempt=attempt,
+                phase="before",
+                scope=scope,
+                ocr_mode=ocr_mode,
+            )
+            # if before_boxes:
+            #     logger.info(
+            #         "entry step OCR | device=%s | step=%s | type=%s | attempt=%s | boxes=%s",
+            #         self.device_id,
+            #         step_index,
+            #         step_type,
+            #         attempt,
+            #         before_boxes,
+            #     )
+            # else:
+            #     logger.info(
+            #         "entry step OCR | device=%s | step=%s | type=%s | attempt=%s | OCR failed",
+            #         self.device_id,
+            #         step_index,
+            #         step_type,
+            #         attempt,
+            #     )
+            if before_boxes is None:
+                logger.warning(
+                    "entry step screenshot/ocr failed | device=%s | step=%s | attempt=%s/%s",
+                    self.device_id,
+                    step_index,
+                    attempt,
+                    max_retries,
+                )
+                time.sleep(1)
+                continue
+
+            # if before_boxes:
+            #     logger.info(
+            #         "entry step scoped OCR | device=%s | step=%s | type=%s | attempt=%s | boxes=%s",
+            #         self.device_id,
+            #         step_index,
+            #         step_type,
+            #         attempt,
+            #         before_boxes,
+            #     )
+            # else:
+            #     logger.info(
+            #         "entry step scoped OCR | device=%s | step=%s | type=%s | attempt=%s | OCR failed",
+            #         self.device_id,
+            #         step_index,
+            #         step_type,
+            #         attempt,
+            #     )
+
+            if step_type == "click_text" and (not target or not self._contains_text(before_boxes, target)):
+                logger.warning(
+                    "entry step target not found | device=%s | step=%s | scope=%s | target=%s | attempt=%s/%s",
+                    self.device_id,
+                    step_index,
+                    scope,
+                    target,
+                    attempt,
+                    max_retries,
+                )
+                time.sleep(1)
+                continue
+
+            if step_type == "click_text":
+                word_boxes, _ = self._capture_ocr_for_entry(
+                    step_index=step_index,
+                    attempt=attempt,
+                    phase="before_word",
+                    scope=scope,
+                    ocr_mode="word",
+                )
+                ok = self.action_executor.execute(
+                    step,
+                    ocr_boxes=word_boxes or [],
+                    screen_size=screen_size,
+                    apply_scope_filter=False,
+                )
+                if not ok:
+                    logger.info(
+                        "entry step click_text fallback to line OCR | device=%s | step=%s | attempt=%s/%s",
+                        self.device_id,
+                        step_index,
+                        attempt,
+                        max_retries,
+                    )
+                    ok = self.action_executor.execute(
+                        step,
+                        ocr_boxes=before_boxes,
+                        screen_size=screen_size,
+                        apply_scope_filter=False,
+                    )
+            else:
+                ok = self.action_executor.execute(
+                    step,
+                    ocr_boxes=before_boxes,
+                    screen_size=screen_size,
+                    apply_scope_filter=False,
+                )
+            if not ok:
+                logger.warning(
+                    "entry step action failed | device=%s | step=%s | type=%s | attempt=%s/%s",
+                    self.device_id,
+                    step_index,
+                    step_type,
+                    attempt,
+                    max_retries,
+                )
+                time.sleep(1)
+                continue
+
+            if self._is_entry_step_completed(step=step, step_index=step_index, attempt=attempt):
+                logger.info(
+                    "entry step done | device=%s | step=%s | type=%s | attempt=%s/%s",
+                    self.device_id,
+                    step_index,
+                    step_type,
+                    attempt,
+                    max_retries,
+                )
+                return True
+
+            logger.warning(
+                "entry step completion check failed | device=%s | step=%s | type=%s | attempt=%s/%s",
+                self.device_id,
+                step_index,
+                step_type,
+                attempt,
+                max_retries,
+            )
+            time.sleep(1)
+
+        return False
+
+    def _is_entry_step_completed(self, step: dict, step_index: int, attempt: int) -> bool:
+        check = step.get("check")
+        if not check:
+            return True
+
+        check_texts: list[str]
+        if isinstance(check, str):
+            check_texts = [check.strip()] if check.strip() else []
+        elif isinstance(check, list):
+            check_texts = [str(x).strip() for x in check if str(x).strip()]
+        else:
+            return False
+
+        if not check_texts:
+            return False
+
+        scope = str(step.get("check_scope", step.get("scope", "full")))
+
+        time.sleep(1)
+        ocr_mode = str(step.get("ocr_mode", "line")).strip().lower()
+        after_boxes, _ = self._capture_ocr_for_entry(
+            step_index=step_index,
+            attempt=attempt,
+            phase="after",
+            scope=scope,
+            ocr_mode=ocr_mode,
+        )
+        if after_boxes is None:
+            return False
+
+        return all(self._contains_text(after_boxes, text) for text in check_texts)
+
+    def _capture_ocr_for_entry(
+        self,
+        step_index: int,
+        attempt: int,
+        phase: str,
+        scope: str = "full",
+        ocr_mode: str = "line",
+    ) -> tuple[list[OCRBox] | None, tuple[int, int] | None]:
+        screenshot_dir = Path(self.task.execute.screenshot_dir) / self.device_id.replace(":", "_") / "entry"
+        screenshot_dir.mkdir(parents=True, exist_ok=True)
+        img_name = datetime.now().strftime("%Y%m%d_%H%M%S_%f") + f"_step{step_index}_{phase}_{attempt}.png"
+        img_path = screenshot_dir / img_name
+
+        if not self.adb.capture_screenshot(img_path):
+            return None, None
+
+        screen_size = self._get_image_size(img_path)
+
+        if scope == "full":
+            return self._extract_boxes_with_mode(img_path, ocr_mode), screen_size
+
+        # Scope-first strategy for entry: crop image first, then OCR.
+        crop_path, offset = self._crop_image_by_scope(img_path=img_path, scope=scope)
+        if crop_path is None:
+            return self._extract_boxes_with_mode(img_path, ocr_mode), screen_size
+
+        cropped_boxes = self._extract_boxes_with_mode(crop_path, ocr_mode)
+        offset_x, offset_y = offset
+        return [
+            OCRBox(
+                text=box.text,
+                left=box.left + offset_x,
+                top=box.top + offset_y,
+                width=box.width,
+                height=box.height,
+            )
+            for box in cropped_boxes
+        ], screen_size
+
+    @staticmethod
+    def _get_image_size(img_path: Path) -> tuple[int, int] | None:
+        try:
+            from PIL import Image
+
+            with Image.open(img_path) as img:
+                return img.size
+        except Exception:
+            return None
+
+    def _extract_boxes_with_mode(self, img_path: Path, ocr_mode: str) -> list[OCRBox]:
+        if ocr_mode == "word":
+            return self.ocr.extract_word_boxes(img_path)
+        return self.ocr.extract_text_boxes(img_path)
+
+    def _crop_image_by_scope(self, img_path: Path, scope: str) -> tuple[Path | None, tuple[int, int]]:
+        try:
+            from PIL import Image
+        except Exception:
+            logger.warning("scope crop requires pillow, fallback to full-image OCR | device=%s", self.device_id)
+            return None, (0, 0)
+
+        with Image.open(img_path) as img:
+            width, height = img.size
+            x1, y1, x2, y2 = self._scope_bounds(scope=scope, width=width, height=height)
+            if x2 <= x1 or y2 <= y1:
+                return None, (0, 0)
+
+            cropped = img.crop((x1, y1, x2, y2))
+            crop_path = img_path.with_name(f"{img_path.stem}_crop_{scope}{img_path.suffix}")
+            cropped.save(crop_path)
+            return crop_path, (x1, y1)
+
+    @staticmethod
+    def _scope_bounds(scope: str, width: int, height: int) -> tuple[int, int, int, int]:
+        top_max_y = int(height * 0.2)
+        bottom_min_y = int(height * 0.8)
+        center_min_y = int(height * 0.2)
+        center_max_y = int(height * 0.8)
+        left_max_x = int(width * 0.5)
+        right_min_x = int(width * 0.5)
+
+        if scope == "top":
+            return (0, 0, width, top_max_y)
+        if scope == "top_left":
+            return (0, 0, left_max_x, top_max_y)
+        if scope == "top_right":
+            return (right_min_x, 0, width, top_max_y)
+        if scope == "center":
+            return (0, center_min_y, width, center_max_y)
+        if scope == "bottom":
+            return (0, bottom_min_y, width, height)
+        if scope == "bottom_left":
+            return (0, bottom_min_y, left_max_x, height)
+        if scope == "bottom_right":
+            return (right_min_x, bottom_min_y, width, height)
+        return (0, 0, width, height)
+
+    @staticmethod
+    def _contains_text(boxes, target: str) -> bool:
+        normalized_target = target.replace(" ", "")
+        for box in boxes:
+            if normalized_target in box.text.replace(" ", ""):
+                return True
+        return False
+
+    def _sleep_poll(self) -> None:
+        time.sleep(self.task.execute.poll_interval_seconds)
+
+    def _exit_to_home(self, reason: str) -> None:
+        exit_activity = self.adb.current_activity()
+        home_ok = self.adb.press_home()
+        logger.info("task exit go home | device=%s | reason=%s | ok=%s", self.device_id, reason, home_ok)
+
+        package = self._resolve_exit_package(exit_activity)
+        if not package:
+            logger.warning("task exit force-stop skipped | device=%s | reason=%s | no package", self.device_id, reason)
+            return
+
+        stop_ok = self.adb.force_stop_app(package)
+        logger.info(
+            "task exit force-stop | device=%s | reason=%s | package=%s | ok=%s",
+            self.device_id,
+            reason,
+            package,
+            stop_ok,
+        )
+
+    def _resolve_exit_package(self, exit_activity: str) -> str:
+        launch = self.task.entry.launch or {}
+        launch_package = str(launch.get("package", "")).strip()
+        if launch_package:
+            return launch_package
+
+        if "/" in exit_activity:
+            return exit_activity.split("/", 1)[0].strip()
+        return ""

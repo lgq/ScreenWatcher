@@ -1,0 +1,30 @@
+{
+  "name": "演示任务",
+  "entry": {
+    "start_from_home": true,
+    "launch": {
+      "package": "com.example.app",
+      "wait_seconds": 3
+    },
+    "steps": []
+  },
+  "execute": {
+    "poll_interval_seconds": 8,
+    "screenshot_dir": "task_engine_v2/screenshots",
+    "required_activities": [],
+    "scenarios": [
+      {
+        "name": "结束任务",
+        "screen_text": ["停止"],
+        "action": {
+          "type": "stop_task"
+        },
+        "stop_task": true
+      }
+    ]
+  },
+  "exit": {
+    "max_duration_seconds": 600,
+    "stop_on_action_types": ["stop_task"]
+  }
+}
