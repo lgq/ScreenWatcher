@@ -21,5 +21,6 @@
     "keep_scope_temp_images": false,
     "poll_interval_seconds": 3,
     "run_duration_minutes": 60,
-    "screenshot_dir": "temp_screenshots"
+    "screenshot_dir": "temp_screenshots",
+    "app_monitor_cycle": []
 }

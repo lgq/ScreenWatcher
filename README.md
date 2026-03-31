@@ -129,6 +129,162 @@
 
 - 若某设备不在 app_loop 中，则走“简单监控模式”（不做应用切换）
 - app_loop 中除上述字段外的其他字段会被忽略
+### 2.4 app_monitor_cycle 元素结构
+
+> 新功能：通过应用包名循环监控，支持每个应用自定义监控时长和进入动作序列
+
+整体结构：
+
+- device_id
+  - 类型：string
+  - 必填
+  - 作用：设备序列号（adb devices 显示的 ID）
+
+- apps
+  - 类型：array[object]
+  - 必填
+  - 作用：要循环监控的应用列表
+
+- duration_minutes
+  - 类型：int
+  - 可选
+  - 默认值：30
+  - 最小值：1
+  - 作用：设备级别的默认监控时长（分钟），应用未单独配置时使用此值
+
+#### apps 数组元素结构
+
+- package
+  - 类型：string
+  - 必填
+  - 作用：应用包名（例如 com.kuaishou.nebula）
+
+- name
+  - 类型：string
+  - 可选
+  - 默认值：package
+  - 作用：应用显示名称，仅用于日志
+
+- duration_minutes
+  - 类型：int
+  - 可选
+  - 默认值：使用设备级别的 duration_minutes
+  - 最小值：1
+  - **新功能**：允许每个应用单独配置监控时长
+
+- enter_actions
+  - 类型：array[object]
+  - 可选
+  - 默认值：[]
+  - **新功能**：启动应用后执行的动作序列，支持多步骤自动化进入指定界面
+
+#### enter_actions 数组元素结构
+
+支持的 action type：
+
+- **click_coords**：点击指定坐标
+  - x：int，必填，横坐标
+  - y：int，必填，纵坐标
+
+- **click_text**：查找文本并点击（使用 OCR）
+  - target：string，必填，要查找的文本内容
+  - scope：string，可选，限制搜索范围（例如 "top", "bottom", "left", "right"）
+
+- **swipe**：滑动操作
+  - start_x：int，必填，起始横坐标
+  - start_y：int，必填，起始纵坐标
+  - end_x：int，必填，结束横坐标
+  - end_y：int，必填，结束纵坐标
+  - duration_ms：int，可选，默认 300，滑动时长（毫秒）
+
+- **back**：返回键
+  - 无参数
+
+- **home**：返回主屏幕
+  - 无参数
+
+- **sleep**：等待（用于让界面加载）
+  - seconds：int，可选，默认 1，等待秒数
+
+#### 监控流程
+
+针对每个应用，依次执行：
+
+1. 🏠 返回桌面
+2. 📱 启动应用（通过包名）
+3. 🎬 执行进入动作序列（如果配置）
+4. 👁️ 监控指定时长（期间会触发 scenarios 处理）
+5. ♻️ 循环到下一个应用
+
+说明：
+
+- 若某设备同时配置了 app_monitor_cycle 和 app_loop，则优先使用 app_monitor_cycle
+- 若某设备不在任何配置中，则走"简单监控模式"
+
+#### 完整配置示例
+
+```json
+"app_monitor_cycle": [
+    {
+        "device_id": "NFOA190110",
+        "duration_minutes": 30,
+        "apps": [
+            {
+                "package": "com.kuaishou.nebula",
+                "name": "快手",
+                "duration_minutes": 20,
+                "enter_actions": [
+                    {
+                        "type": "click_text",
+                        "target": "看视频再领"
+                    },
+                    {
+                        "type": "sleep",
+                        "seconds": 2
+                    }
+                ]
+            },
+            {
+                "package": "com.tencent.mm",
+                "name": "微信",
+                "enter_actions": [
+                    {
+                        "type": "click_text",
+                        "target": "发现"
+                    }
+                ]
+            },
+            {
+                "package": "com.taobao.taobao",
+                "name": "淘宝",
+                "duration_minutes": 45
+            },
+            {
+                "package": "com.phoenix.read",
+                "name": "UC读书",
+                "enter_actions": [
+                    {
+                        "type": "click_coords",
+                        "x": 540,
+                        "y": 1080
+                    },
+                    {
+                        "type": "sleep",
+                        "seconds": 3
+                    }
+                ]
+            }
+        ]
+    }
+]
+```
+
+#### 配置解释说明
+
+- **快手**：自定义为 20 分钟监控，启动后自动点击"看视频再领"文字，然后等待 2 秒
+- **微信**：使用设备默认 30 分钟时长，启动后自动点击"发现"文字进入发现页
+- **淘宝**：自定义为 45 分钟监控，无进入动作（启动后直接监控）
+- **UC读书**：使用设备默认 30 分钟时长，通过坐标点击进入，然后等待 3 秒界面加载
 
 ## 3. 运行规则配置（config.json / <包名>_config.json）
 

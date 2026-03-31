@@ -55,6 +55,7 @@ class ConfigService:
 
         settings["adb_wifi_devices"] = self._normalize_adb_wifi_devices(settings.get("adb_wifi_devices", []))
         settings["app_loop"] = self._normalize_app_loop(settings.get("app_loop", []))
+        settings["app_monitor_cycle"] = self._normalize_app_monitor_cycle(settings.get("app_monitor_cycle", []))
         settings["remote_control"] = self._normalize_remote_control(settings.get("remote_control", {}))
         return settings
 
@@ -155,6 +156,67 @@ class ConfigService:
             )
 
         return normalized_loop
+
+    def _normalize_app_monitor_cycle(self, app_monitor_cycle: Any) -> List[Dict[str, Any]]:
+        if not isinstance(app_monitor_cycle, list):
+            return []
+
+        normalized_cycles: List[Dict[str, Any]] = []
+        for item in app_monitor_cycle:
+            if not isinstance(item, dict):
+                continue
+
+            device_id = str(item.get("device_id", "")).strip()
+            if not device_id:
+                continue
+
+            apps = item.get("apps", [])
+            if not isinstance(apps, list):
+                apps = []
+
+            normalized_apps = []
+            for app in apps:
+                if not isinstance(app, dict):
+                    continue
+                package = str(app.get("package", "")).strip()
+                if not package:
+                    continue
+                name = str(app.get("name", package)).strip() or package
+                # 每个应用可独立配置监控时长，若未配置则使用设备级别的默认值
+                app_duration = app.get("duration_minutes")
+                if app_duration is not None:
+                    app_duration = max(1, self._to_int(app_duration, 30))
+                # 进入应用后的动作序列（可能多步）
+                enter_actions = app.get("enter_actions")
+                if not isinstance(enter_actions, list):
+                    enter_actions = []
+                # 规范化每个 action，保持与 scenario executor 一致的格式
+                normalized_actions = []
+                for action in enter_actions:
+                    if isinstance(action, dict) and action.get("type"):
+                        normalized_actions.append(action)
+                normalized_apps.append({
+                    "package": package,
+                    "name": name,
+                    "duration_minutes": app_duration,
+                    "enter_actions": normalized_actions,
+                })
+
+            if not normalized_apps:
+                continue
+
+            # 设备级别的默认监控时长（若应用未指定）
+            default_duration_minutes = max(1, self._to_int(item.get("duration_minutes", 30), 30))
+
+            normalized_cycles.append(
+                {
+                    "device_id": device_id,
+                    "apps": normalized_apps,
+                    "default_duration_minutes": default_duration_minutes,
+                }
+            )
+
+        return normalized_cycles
 
     def _normalize_activity_random_swipe_up(self, value: Any) -> Dict[str, Any]:
         if value is False:

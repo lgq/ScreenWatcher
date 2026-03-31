@@ -1,0 +1,78 @@
+{
+    "adb_path": "adb",
+    "adb_wifi_devices": [
+        "192.168.0.130:43089",
+        "192.168.0.131:39395"
+    ],
+    "remote_control": {
+        "enabled": false,
+        "supabase_url": "",
+        "supabase_key": "",
+        "access_token": "",
+        "project_id": "screenwatcher-prod",
+        "device_id": "",
+        "device_name": "",
+        "config_poll_seconds": 10,
+        "status_upload_seconds": 10,
+        "config_table": "watch_config_versions",
+        "device_table": "watch_devices",
+        "status_table": "watch_device_status_logs"
+    },
+    "keep_scope_temp_images": false,
+    "poll_interval_seconds": 3,
+    "run_duration_minutes": 60,
+    "screenshot_dir": "temp_screenshots",
+    "app_monitor_cycle": [
+        {
+            "device_id": "NFOA190110",
+            "duration_minutes": 30,
+            "apps": [
+                {
+                    "package": "com.kuaishou.nebula",
+                    "name": "快手",
+                    "duration_minutes": 20,
+                    "enter_actions": [
+                        {
+                            "type": "click_text",
+                            "target": "看视频再领"
+                        },
+                        {
+                            "type": "sleep",
+                            "seconds": 2
+                        }
+                    ]
+                },
+                {
+                    "package": "com.tencent.mm",
+                    "name": "微信",
+                    "enter_actions": [
+                        {
+                            "type": "click_text",
+                            "target": "发现"
+                        }
+                    ]
+                },
+                {
+                    "package": "com.taobao.taobao",
+                    "name": "淘宝",
+                    "duration_minutes": 45
+                },
+                {
+                    "package": "com.phoenix.read",
+                    "name": "UC读书",
+                    "enter_actions": [
+                        {
+                            "type": "click_coords",
+                            "x": 540,
+                            "y": 1080
+                        },
+                        {
+                            "type": "sleep",
+                            "seconds": 3
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
