@@ -45,8 +45,19 @@ class ActionExecutor:
         if action_type == "tap":
             x = int(action.get("x", 0))
             y = int(action.get("y", 0))
-            logger.info("tap action coords | x=%s | y=%s", x, y)
-            return self.adb.tap(x, y)
+            offset_x, offset_y = self._parse_offset(action.get("offset"))
+            final_x = x + offset_x
+            final_y = y + offset_y
+            logger.info(
+                "tap action coords | x=%s | y=%s | offset=(%s,%s) | final=(%s,%s)",
+                x,
+                y,
+                offset_x,
+                offset_y,
+                final_x,
+                final_y,
+            )
+            return self.adb.tap(final_x, final_y)
 
         if action_type == "swipe":
             return self.adb.swipe(
@@ -72,6 +83,7 @@ class ActionExecutor:
         if action_type == "click_text":
             targets = self._normalize_targets(action.get("target", ""))
             match_mode = self._normalize_match_mode(action.get("target_match", "and"))
+            offset_x, offset_y = self._parse_offset(action.get("offset"))
             scope = str(action.get("scope", "full"))
             ocr_mode = str(action.get("ocr_mode", "word")).strip().lower()
             if not targets:
@@ -109,8 +121,10 @@ class ActionExecutor:
                     continue
 
                 x, y, est_left, est_width = self._estimate_target_center(box, click_target)
+                final_x = x + offset_x
+                final_y = y + offset_y
                 logger.info(
-                    "click_text tap coords | ocr_mode=%s | scope=%s | target=%s | targets=%s | match=%s | x=%s | y=%s | box=(%s,%s,%s,%s) | est=(left=%s,width=%s)",
+                    "click_text tap coords | ocr_mode=%s | scope=%s | target=%s | targets=%s | match=%s | x=%s | y=%s | offset=(%s,%s) | final=(%s,%s) | box=(%s,%s,%s,%s) | est=(left=%s,width=%s)",
                     mode_name,
                     scope,
                     click_target,
@@ -118,6 +132,10 @@ class ActionExecutor:
                     match_mode,
                     x,
                     y,
+                    offset_x,
+                    offset_y,
+                    final_x,
+                    final_y,
                     box.left,
                     box.top,
                     box.width,
@@ -125,7 +143,7 @@ class ActionExecutor:
                     est_left,
                     est_width,
                 )
-                return self.adb.tap(x, y)
+                return self.adb.tap(final_x, final_y)
 
             logger.warning("click_text target not found: scope=%s targets=%s match=%s", scope, targets, match_mode)
             return False
@@ -192,6 +210,17 @@ class ActionExecutor:
         if mode == "or":
             return "or"
         return "and"
+
+    @staticmethod
+    def _parse_offset(raw_offset: Any) -> tuple[int, int]:
+        if not isinstance(raw_offset, dict):
+            return 0, 0
+        try:
+            offset_x = int(raw_offset.get("x", 0))
+            offset_y = int(raw_offset.get("y", 0))
+        except Exception:
+            return 0, 0
+        return offset_x, offset_y
 
     @staticmethod
     def _estimate_target_center(box: OCRBox, target: str) -> tuple[int, int, int, int]:

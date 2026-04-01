@@ -30,6 +30,22 @@ class DeviceTaskScheduler:
 
         wifi_devices = load_wifi_devices(self.assignments_file)
         assignments_path = Path(self.assignments_file).resolve()
+        if not wifi_devices:
+            fallback_path = assignments_path.parent / "devices.json"
+            if fallback_path != assignments_path and fallback_path.exists():
+                wifi_devices = load_wifi_devices(fallback_path)
+                if wifi_devices:
+                    logger.info(
+                        "wifi_devices not found in %s, fallback to %s | count=%s",
+                        assignments_path.name,
+                        fallback_path.name,
+                        len(wifi_devices),
+                    )
+        if not wifi_devices:
+            logger.warning(
+                "no wifi devices configured in %s (supported keys: wifi_devices, adb_wifi_devices)",
+                assignments_path.name,
+            )
 
         running_threads: dict[str, threading.Thread] = {}
         handled_devices: set[str] = set()

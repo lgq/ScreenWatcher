@@ -429,6 +429,10 @@ class TaskRunner:
             return (right_min_x, 0, width, top_max_y)
         if scope == "center":
             return (0, center_min_y, width, center_max_y)
+        if scope == "center_left":
+            return (0, center_min_y, left_max_x, center_max_y)
+        if scope == "center_right":
+            return (right_min_x, center_min_y, width, center_max_y)
         if scope == "bottom":
             return (0, bottom_min_y, width, height)
         if scope == "bottom_left":

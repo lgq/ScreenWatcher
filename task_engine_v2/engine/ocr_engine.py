@@ -201,6 +201,12 @@ def filter_by_scope(boxes: Iterable[OCRBox], scope: str, width: int | None = Non
         if scope == "center":
             if center_min_y <= cy <= center_max_y:
                 out.append(box)
+        elif scope == "center_left":
+            if cx <= left_max_x and center_min_y <= cy <= center_max_y:
+                out.append(box)
+        elif scope == "center_right":
+            if cx >= right_min_x and center_min_y <= cy <= center_max_y:
+                out.append(box)
         elif scope == "top_left":
             if cx <= left_max_x and cy <= top_max_y:
                 out.append(box)

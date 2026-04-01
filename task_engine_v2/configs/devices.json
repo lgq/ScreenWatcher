@@ -1,7 +1,11 @@
 {
   "wifi_devices": [
-    { "serial": "192.168.0.130:42379" },
-    { "serial": "192.168.0.131:37033" }
+    {
+      "serial": "192.168.0.130:42379"
+    },
+    {
+      "serial": "192.168.0.131:37033"
+    }
   ],
   "assignments": [
     {
@@ -18,11 +22,15 @@
       "need_loop": true
     },
     {
+      "task_file": "tasks/hongguo_watch_video.json",
+      "need_loop": true
+    },
+    {
       "task_file": "tasks/kuaishou_watch_ad.json",
       "need_loop": true
     },
     {
-      "task_file": "tasks/hongguo_watch_video.json",
+      "task_file": "tasks/hongguo_gold_coins.json",
       "need_loop": true
     }
   ]

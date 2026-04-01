@@ -84,6 +84,10 @@ python task_engine_v2/run.py --assignments task_engine_v2/configs/devices.json -
 - `target_match`：可选。仅当 `target` 为数组时生效。
   - `"and"`（默认）：数组内文本都要命中。
   - `"or"`：数组内任意一个命中即可。
+- `offset`：可选。点击偏移量，格式为 `{"x": 10, "y": -20}`。
+  - 正数表示在原坐标基础上增加。
+  - 负数表示在原坐标基础上减少。
+  - 当前对 `tap` 和 `click_text` 生效。
 - `scope`：识别范围（见下方 scope 定义）。
 - `ocr_mode`：OCR 粒度（`line` 或 `word`）。
 
@@ -103,6 +107,8 @@ python task_engine_v2/run.py --assignments task_engine_v2/configs/devices.json -
 - `top_left`：上 20% 且左 50%
 - `top_right`：上 20% 且右 50%
 - `center`：中间 60%
+- `center_left`：中间 60% 且左 50%
+- `center_right`：中间 60% 且右 50%
 - `bottom`：下 20%
 - `bottom_left`：下 20% 且左 50%
 - `bottom_right`：下 20% 且右 50%

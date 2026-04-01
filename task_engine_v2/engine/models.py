@@ -122,10 +122,24 @@ def load_wifi_devices(path: str | Path) -> list[WifiDeviceConfig]:
     file_path = Path(path)
     data = json.loads(file_path.read_text(encoding="utf-8"))
     wifi_devices: list[WifiDeviceConfig] = []
-    for item in data.get("wifi_devices", []):
-        serial = str(item.get("serial", "")).strip()
+
+    raw_items = data.get("wifi_devices")
+    if raw_items is None:
+        # Compatibility with ScreenWatcher settings-style key.
+        raw_items = data.get("adb_wifi_devices", [])
+
+    for item in raw_items or []:
+        serial = ""
+        auto_connect = True
+
+        if isinstance(item, str):
+            serial = item.strip()
+        elif isinstance(item, dict):
+            serial = str(item.get("serial", "")).strip()
+            auto_connect = bool(item.get("auto_connect", True))
+
         if not serial:
             continue
-        auto_connect = bool(item.get("auto_connect", True))
         wifi_devices.append(WifiDeviceConfig(serial=serial, auto_connect=auto_connect))
+
     return wifi_devices

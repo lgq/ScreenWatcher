@@ -10,8 +10,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Independent task runner with multi-device support")
     parser.add_argument(
         "--assignments",
-        required=True,
-        help="Path to device assignment json",
+        default="task_engine_v2/configs/devices.json",
+        help="Path to device assignment json (default: task_engine_v2/configs/devices.json)",
     )
     parser.add_argument("--adb-path", default="adb", help="adb executable path")
     parser.add_argument("--log-level", default="INFO", help="DEBUG/INFO/WARNING/ERROR")
