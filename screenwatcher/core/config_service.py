@@ -3,7 +3,7 @@ import os
 import socket
 from typing import Any, Dict, List, Tuple
 
-from screenwatcher import runtime_paths
+from . import runtime_paths
 
 
 class ConfigError(Exception):

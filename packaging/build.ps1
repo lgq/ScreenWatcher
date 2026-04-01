@@ -93,18 +93,19 @@ function Reset-BuildFolders {
 }
 
 function Copy-DefaultConfigs {
+    $SwRoot = Join-Path $ProjectRoot "screenwatcher"
     foreach ($name in @("settings_config.json", "config.json")) {
-        $source = Join-Path $ProjectRoot $name
+        $source = Join-Path $SwRoot $name
         if (Test-Path $source) {
             Copy-Item $source $DefaultsRoot -Force
         }
     }
 
-    Get-ChildItem -Path $ProjectRoot -Filter "*_config.json" -File | ForEach-Object {
+    Get-ChildItem -Path $SwRoot -Filter "*_config.json" -File | ForEach-Object {
         Copy-Item $_.FullName $DefaultsRoot -Force
     }
 
-    $appConfigs = Join-Path $ProjectRoot "app_configs"
+    $appConfigs = Join-Path $SwRoot "app_configs"
     if (Test-Path $appConfigs) {
         Copy-Item $appConfigs (Join-Path $DefaultsRoot "app_configs") -Recurse -Force
     }

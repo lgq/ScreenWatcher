@@ -8,6 +8,7 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 SPEC_FILE = os.path.abspath(sys.argv[-1])
 SPEC_DIR = os.path.abspath(os.path.dirname(SPEC_FILE))
 PROJECT_ROOT = os.path.abspath(os.path.join(SPEC_DIR, ".."))
+SW_ROOT = os.path.join(PROJECT_ROOT, "screenwatcher")
 STAGING_ROOT = os.path.join(PROJECT_ROOT, "build", "staging")
 DEFAULTS_ROOT = os.path.join(STAGING_ROOT, "defaults")
 PLATFORM_TOOLS_ROOT = os.path.join(STAGING_ROOT, "platform-tools")
@@ -63,8 +64,8 @@ hiddenimports += [
 
 
 a = Analysis(
-    [os.path.join(PROJECT_ROOT, "main.py")],
-    pathex=[PROJECT_ROOT],
+    [os.path.join(SW_ROOT, "run.py")],
+    pathex=[SW_ROOT, PROJECT_ROOT],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,

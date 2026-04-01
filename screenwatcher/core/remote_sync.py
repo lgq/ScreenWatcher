@@ -9,9 +9,9 @@ from urllib import error, parse, request
 
 import adb_util
 
-from screenwatcher import __version__, runtime_paths
-from screenwatcher.config_service import ConfigService
-from screenwatcher.remote_protocol import validate_remote_bundle
+from . import __version__, runtime_paths
+from .config_service import ConfigService
+from .remote_protocol import validate_remote_bundle
 
 
 def _utc_now_iso() -> str:

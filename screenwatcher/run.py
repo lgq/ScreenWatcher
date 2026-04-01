@@ -17,10 +17,10 @@ def _timestamped_print(*args, **kwargs):
 
 builtins.print = _timestamped_print
 
-from screenwatcher.config_service import ConfigError, ConfigService
-from screenwatcher.device_monitor import DeviceMonitor
-from screenwatcher.device_processor import DeviceProcessor
-from screenwatcher.remote_sync import RemoteControlService
+from core.config_service import ConfigError, ConfigService
+from core.device_monitor import DeviceMonitor
+from core.device_processor import DeviceProcessor
+from core.remote_sync import RemoteControlService
 
 
 async def main():

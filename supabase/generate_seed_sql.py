@@ -5,11 +5,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+# generate_seed_sql.py 需要访问 screenwatcher/core/ 包
+_SW_DIR = Path(__file__).resolve().parents[1] / "screenwatcher"
+if str(_SW_DIR) not in sys.path:
+    sys.path.insert(0, str(_SW_DIR))
 
-from screenwatcher.remote_protocol import compute_bundle_hash
+from core.remote_protocol import compute_bundle_hash
 
 
 def _utc_now_iso() -> str:

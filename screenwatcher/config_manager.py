@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from screenwatcher.config_service import ConfigError, ConfigService
+from core.config_service import ConfigError, ConfigService
 
 
 CONFIG: Dict[str, Any] = {}

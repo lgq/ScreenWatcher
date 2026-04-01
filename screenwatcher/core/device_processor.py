@@ -3,9 +3,9 @@ import time
 
 import adb_util
 
-from screenwatcher.activity_rules import ActivityRuleHandler
-from screenwatcher.config_service import ConfigService
-from screenwatcher.scenario_executor import ScenarioExecutor
+from .activity_rules import ActivityRuleHandler
+from .config_service import ConfigService
+from .scenario_executor import ScenarioExecutor
 
 
 class DeviceProcessor:

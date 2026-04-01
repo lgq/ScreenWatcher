@@ -5,10 +5,10 @@ from typing import Any, Dict, Optional
 
 import adb_util
 
-from screenwatcher.action_executor import ActionExecutor
-from screenwatcher.config_service import ConfigService
-from screenwatcher.device_processor import DeviceProcessor
-from screenwatcher.remote_sync import RemoteControlService
+from .action_executor import ActionExecutor
+from .config_service import ConfigService
+from .device_processor import DeviceProcessor
+from .remote_sync import RemoteControlService
 
 
 class DeviceMonitor:
