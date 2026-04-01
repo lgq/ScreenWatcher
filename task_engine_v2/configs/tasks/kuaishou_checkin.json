@@ -1,0 +1,47 @@
+{
+  "name": "快手极速版-连续打卡",
+  "entry": {
+    "start_from_home": true,
+    "launch": {
+      "package": "com.kuaishou.nebula",
+      "activity": "com.yxcorp.gifshow.HomeActivity",
+      "wait_seconds": 4
+    },
+    "steps": [
+      {
+        "type": "sleep",
+        "seconds": 2
+      }
+    ]
+  },
+  "execute": {
+    "poll_interval_seconds": 3,
+    "screenshot_dir": "task_engine_v2/screenshots",
+    "required_activities": [
+      "com.cat.readall/.activity.BrowserMainActivity",
+      "com.cat.readall/com.ss.android.template.page.DefaultLynxActivity"
+    ],
+    "scenarios": [
+      {
+        "name": "连续打卡7天",
+        "screen_text": ["连续打卡", "继续打卡"],
+        "action": {
+          "type": "click_text",
+          "target": "继续打卡"
+        }
+      },
+      {
+        "name": "连续打卡7天",
+        "screen_text": ["连续打卡", "立即打卡"],
+        "action": {
+          "type": "click_text",
+          "target": "立即打卡"
+        }
+      }
+    ]
+  },
+  "exit": {
+    "max_duration_seconds": 30,
+    "stop_on_action_types": ["stop_task"]
+  }
+}

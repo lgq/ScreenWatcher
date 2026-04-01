@@ -1,0 +1,55 @@
+{
+  "name": "抖音极速版-打卡签到",
+  "entry": {
+    "start_from_home": true,
+    "launch": {
+      "package": "com.motorola.launcher3",
+      "activity": "com.android.launcher3.CustomizationPanelLauncher",
+      "wait_seconds": 4
+    },
+    "steps": [
+      {
+        "type": "click_text",
+        "target": "赚钱助手",
+        "check_wait_seconds": 2
+      },
+      {
+        "type": "sleep",
+        "seconds": 2
+      }
+    ]
+  },
+  "execute": {
+    "poll_interval_seconds": 3,
+    "screenshot_dir": "task_engine_v2/screenshots",
+    "required_activities": [
+      "com.ss.android.ugc.aweme.lite/com.ss.android.excitingvideo.ExcitingVideoActivity",
+      "com.ss.android.ugc.aweme.lite/com.bytedance.android.anniex.container.AnnieXHostActivity",
+      "com.ss.android.ugc.aweme.lite/com.ss.android.ugc.aweme.splash.SplashActivity"
+    ],
+    "scenarios": [
+      {
+        "name": "恭喜累计获得奖励",
+        "screen_text": ["恭喜累计", "评价并收下金币"],
+        "scope": "center",
+        "action": {
+          "type": "click_text",
+          "target": "评价并收下金币"
+        }
+      },
+      {
+        "name": "领取成功",
+        "screen_text": ["领取成功"],
+        "scope": "top_right",
+        "action": {
+          "type": "click_text",
+          "target": "领取成功"
+        }
+      }
+    ]
+  },
+  "exit": {
+    "max_duration_seconds": 30,
+    "stop_on_action_types": ["stop_task"]
+  }
+}

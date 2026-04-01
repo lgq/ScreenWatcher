@@ -1,7 +1,18 @@
 {
   "assignments": [
     {
-      "task_file": "tasks/ad_watch_kuaishou.json"
+      "task_file": "tasks/douying_checkin.json"
+    },
+    {
+      "task_file": "tasks/kuaishou_checkin.json"
+    },
+    {
+      "task_file": "tasks/douying_watch_video.json",
+      "need_loop": true
+    },
+    {
+      "task_file": "tasks/kuaishou_watch_ad.json",
+      "need_loop": true
     }
   ]
 }

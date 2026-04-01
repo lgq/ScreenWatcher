@@ -6,7 +6,7 @@ import threading
 import subprocess
 import time
 
-from .models import load_assignments, load_task_config
+from .models import DeviceAssignment, load_assignments, load_task_config
 from .task_runner import TaskRunner
 
 
@@ -25,20 +25,7 @@ class DeviceTaskScheduler:
             logger.warning("no valid assignments found in %s", self.assignments_file)
             return
 
-        exact_map: dict[str, str] = {}
-        wildcard_task_files: list[str] = []
         assignments_path = Path(self.assignments_file).resolve()
-        for assignment in assignments:
-            if assignment.device_id:
-                if assignment.device_id in exact_map:
-                    logger.error("duplicated device assignment ignored | device=%s", assignment.device_id)
-                    continue
-                exact_map[assignment.device_id] = assignment.task_file
-            else:
-                wildcard_task_files.append(assignment.task_file)
-
-        if len(wildcard_task_files) > 1:
-            logger.warning("multiple wildcard assignments found; only the first one will be used")
 
         running_threads: dict[str, threading.Thread] = {}
         handled_devices: set[str] = set()
@@ -55,26 +42,24 @@ class DeviceTaskScheduler:
                     if device in running_threads or device in handled_devices:
                         continue
 
-                    task_file_str = self._resolve_task_file_for_device(
+                    matched_assignments = self._resolve_assignments_for_device(
                         device_id=device,
-                        exact_map=exact_map,
-                        wildcard_task_files=wildcard_task_files,
+                        assignments=assignments,
                     )
-                    if not task_file_str:
+                    if not matched_assignments:
                         continue
 
-                    task_file = Path(task_file_str)
-                    if not task_file.is_absolute():
-                        task_file = (assignments_path.parent / task_file).resolve()
-
-                    task = load_task_config(task_file)
-                    runner = TaskRunner(device_id=device, task=task, adb_path=self.adb_path)
-                    thread = threading.Thread(target=runner.run, name=f"task-{device}", daemon=False)
+                    thread = threading.Thread(
+                        target=self._run_task_chain_for_device,
+                        args=(device, matched_assignments, assignments_path),
+                        name=f"task-chain-{device}",
+                        daemon=False,
+                    )
                     thread.start()
 
                     running_threads[device] = thread
                     handled_devices.add(device)
-                    logger.info("task scheduled | device=%s | task=%s", device, task.name)
+                    logger.info("task chain scheduled | device=%s | count=%s", device, len(matched_assignments))
 
                 time.sleep(self.poll_interval_seconds)
         except KeyboardInterrupt:
@@ -83,17 +68,85 @@ class DeviceTaskScheduler:
         for thread in running_threads.values():
             thread.join()
 
-    def _resolve_task_file_for_device(
+    def _resolve_assignments_for_device(
         self,
         device_id: str,
-        exact_map: dict[str, str],
-        wildcard_task_files: list[str],
-    ) -> str:
-        if device_id in exact_map:
-            return exact_map[device_id]
-        if wildcard_task_files:
-            return wildcard_task_files[0]
-        return ""
+        assignments: list[DeviceAssignment],
+    ) -> list[DeviceAssignment]:
+        matched: list[DeviceAssignment] = []
+        for assignment in assignments:
+            if not assignment.device_id or assignment.device_id == device_id:
+                matched.append(assignment)
+        return matched
+
+    def _run_task_chain_for_device(self, device_id: str, assignments: list[DeviceAssignment], assignments_path: Path) -> None:
+        if not assignments:
+            return
+
+        loop_assignments = [item for item in assignments if item.need_loop]
+
+        for index, assignment in enumerate(assignments, start=1):
+            self._run_single_assignment(
+                device_id=device_id,
+                assignment=assignment,
+                assignments_path=assignments_path,
+                index=index,
+                total=len(assignments),
+            )
+
+        if not loop_assignments:
+            return
+
+        logger.info("task chain entering loop mode | device=%s | loop_count=%s", device_id, len(loop_assignments))
+        loop_index = 0
+        while True:
+            assignment = loop_assignments[loop_index]
+            self._run_single_assignment(
+                device_id=device_id,
+                assignment=assignment,
+                assignments_path=assignments_path,
+                index=loop_index + 1,
+                total=len(loop_assignments),
+                loop_mode=True,
+            )
+            loop_index = (loop_index + 1) % len(loop_assignments)
+
+    def _run_single_assignment(
+        self,
+        device_id: str,
+        assignment: DeviceAssignment,
+        assignments_path: Path,
+        index: int,
+        total: int,
+        loop_mode: bool = False,
+    ) -> None:
+        task_file = Path(assignment.task_file)
+        if not task_file.is_absolute():
+            task_file = (assignments_path.parent / task_file).resolve()
+
+        task = load_task_config(task_file)
+        logger.info(
+            "task chain start item | device=%s | index=%s/%s | loop_mode=%s | need_loop=%s | task=%s",
+            device_id,
+            index,
+            total,
+            loop_mode,
+            assignment.need_loop,
+            task.name,
+        )
+
+        runner = TaskRunner(device_id=device_id, task=task, adb_path=self.adb_path)
+        runner.run()
+
+        logger.info(
+            "task chain finished item | device=%s | index=%s/%s | loop_mode=%s | need_loop=%s | task=%s",
+            device_id,
+            index,
+            total,
+            loop_mode,
+            assignment.need_loop,
+            task.name,
+        )
 
     def _list_connected_devices(self) -> list[str]:
         cmd = [self.adb_path, "devices"]

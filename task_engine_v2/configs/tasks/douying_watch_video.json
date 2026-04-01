@@ -1,0 +1,44 @@
+{
+  "name": "抖音极速版-看视频",
+  "entry": {
+    "start_from_home": true,
+    "launch": {
+      "package": "com.ss.android.ugc.aweme.lite",
+      "wait_seconds": 4
+    },
+    "steps": [
+      {
+        "type": "sleep",
+        "seconds": 2
+      }
+    ]
+  },
+  "execute": {
+    "poll_interval_seconds": 3,
+    "screenshot_dir": "task_engine_v2/screenshots",
+    "required_activities": [
+      "com.ss.android.ugc.aweme.lite/com.bytedance.android.anniex.container.AnnieXHostActivity",
+      "com.ss.android.ugc.aweme.lite/com.ss.android.ugc.aweme.splash.SplashActivity"
+    ],
+    "scenarios": [],
+    "activity_random_swipe_up": {
+      "enabled": true,
+      "activities": [
+        "com.ss.android.ugc.aweme.lite/com.ss.android.ugc.aweme.splash.SplashActivity"
+      ],
+      "interval_min_seconds": 10,
+      "interval_max_seconds": 15,
+      "start_x": 500,
+      "start_y": 800,
+      "end_x": 500,
+      "end_y": 400,
+      "duration_ms": 150
+    }
+  },
+  "exit": {
+    "max_duration_seconds": 3000,
+    "stop_on_action_types": [
+      "stop_task"
+    ]
+  }
+}

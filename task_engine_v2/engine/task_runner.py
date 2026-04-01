@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 import logging
+import random
 import time
 
 from .adb_client import ADBClient
@@ -22,6 +23,7 @@ class TaskRunner:
         self.adb = ADBClient(device_id=device_id, adb_path=adb_path)
         self.ocr = OCREngine()
         self.action_executor = ActionExecutor(self.adb, self.ocr, screenshot_dir=task.execute.screenshot_dir)
+        self._next_random_swipe_due: float | None = None
 
     def run(self) -> None:
         logger.info("task start | device=%s | task=%s", self.device_id, self.task.name)
@@ -65,6 +67,8 @@ class TaskRunner:
                 self._sleep_poll()
                 continue
 
+            self._try_activity_random_swipe_up(current_activity)
+
             # Scenario matching keeps line-level OCR for better recall.
             boxes = self.ocr.extract_text_boxes(img_path)
             screen_size = self._get_image_size(img_path)
@@ -86,11 +90,10 @@ class TaskRunner:
             else:
                 ok = self.action_executor.execute(scenario.action, ocr_boxes=boxes, screen_size=screen_size)
             logger.info(
-                "scenario matched | device=%s | scenario=%s | action=%s | ok=%s",
-                self.device_id,
-                scenario.name,
+                "scenario matched | action=%s | ok=%s",
                 action_type,
                 ok,
+                extra={"scenario": f"scenario={scenario.name}"},
             )
 
             if scenario.stop_task or action_type in self.task.exit.stop_on_action_types:
@@ -414,6 +417,44 @@ class TaskRunner:
 
     def _sleep_poll(self) -> None:
         time.sleep(self.task.execute.poll_interval_seconds)
+
+    def _try_activity_random_swipe_up(self, current_activity: str) -> None:
+        cfg = self.task.execute.activity_random_swipe_up or {}
+        if not cfg or not bool(cfg.get("enabled", False)):
+            return
+
+        activities = [str(x) for x in cfg.get("activities", [])]
+        if activities and current_activity not in activities:
+            return
+
+        now = time.monotonic()
+        if self._next_random_swipe_due is not None and now < self._next_random_swipe_due:
+            return
+
+        min_seconds = max(1, int(cfg.get("interval_min_seconds", 10)))
+        max_seconds = max(min_seconds, int(cfg.get("interval_max_seconds", min_seconds)))
+
+        start_x = int(cfg.get("start_x", 500))
+        start_y = int(cfg.get("start_y", 800))
+        end_x = int(cfg.get("end_x", 500))
+        end_y = int(cfg.get("end_y", 400))
+        duration_ms = int(cfg.get("duration_ms", 200))
+
+        ok = self.adb.swipe(start_x, start_y, end_x, end_y, duration_ms)
+        logger.info(
+            "activity random swipe up | device=%s | current=%s | ok=%s | from=(%s,%s) | to=(%s,%s) | duration_ms=%s",
+            self.device_id,
+            current_activity,
+            ok,
+            start_x,
+            start_y,
+            end_x,
+            end_y,
+            duration_ms,
+        )
+
+        next_interval = random.randint(min_seconds, max_seconds)
+        self._next_random_swipe_due = now + next_interval
 
     def _exit_to_home(self, reason: str) -> None:
         exit_activity = self.adb.current_activity()

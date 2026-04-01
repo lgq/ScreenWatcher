@@ -1,0 +1,62 @@
+{
+  "name": "抖音极速版-打卡签到",
+  "entry": {
+    "start_from_home": true,
+    "launch": {
+      "package": "com.motorola.launcher3",
+      "activity": "com.android.launcher3.CustomizationPanelLauncher",
+      "wait_seconds": 4
+    },
+    "steps": [
+      {
+        "type": "click_text",
+        "target": "赚钱助手",
+        "check_wait_seconds": 2
+      },
+      {
+        "type": "sleep",
+        "seconds": 2
+      }
+    ]
+  },
+  "execute": {
+    "poll_interval_seconds": 3,
+    "screenshot_dir": "task_engine_v2/screenshots",
+    "required_activities": [
+      "com.ss.android.ugc.aweme.lite/com.bytedance.android.anniex.container.AnnieXHostActivity",
+      "com.ss.android.ugc.aweme.lite/com.ss.android.ugc.aweme.splash.SplashActivity"
+    ],
+    "scenarios": [
+      {
+        "name": "获得开宝箱奖励",
+        "screen_text": ["获得开宝箱奖励", "开心收下"],
+        "scope": "center",
+        "action": {
+          "type": "click_text",
+          "target": "开心收下"
+        }
+      },
+      {
+        "name": "去签到",
+        "screen_text": ["去签到"],
+        "scope": "center",
+        "action": {
+          "type": "click_text",
+          "target": "去签到"
+        }
+      },
+      {
+        "name": "连续打卡7天",
+        "screen_text": ["连续打卡", "立即打卡"],
+        "action": {
+          "type": "click_text",
+          "target": "立即打卡"
+        }
+      }
+    ]
+  },
+  "exit": {
+    "max_duration_seconds": 30,
+    "stop_on_action_types": ["stop_task"]
+  }
+}

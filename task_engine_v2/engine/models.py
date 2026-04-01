@@ -28,6 +28,7 @@ class ExecuteConfig:
     required_activities: list[str] = field(default_factory=list)
     screenshot_dir: str = "task_engine_v2/screenshots"
     scenarios: list[ScenarioConfig] = field(default_factory=list)
+    activity_random_swipe_up: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -48,6 +49,7 @@ class TaskConfig:
 class DeviceAssignment:
     device_id: str
     task_file: str
+    need_loop: bool = False
 
 
 def _parse_scenarios(raw_scenarios: list[dict[str, Any]]) -> list[ScenarioConfig]:
@@ -84,6 +86,7 @@ def load_task_config(path: str | Path) -> TaskConfig:
         required_activities=[str(x) for x in execute_data.get("required_activities", [])],
         screenshot_dir=str(execute_data.get("screenshot_dir", "task_engine_v2/screenshots")),
         scenarios=_parse_scenarios(execute_data.get("scenarios", [])),
+        activity_random_swipe_up=dict(execute_data.get("activity_random_swipe_up", {})),
     )
 
     exit_cfg = ExitConfig(
@@ -102,7 +105,8 @@ def load_assignments(path: str | Path) -> list[DeviceAssignment]:
     for item in raw_assignments:
         device_id = str(item.get("device_id", "")).strip()
         task_file = str(item.get("task_file", "")).strip()
+        need_loop = bool(item.get("need_loop", False))
         if not task_file:
             continue
-        assignments.append(DeviceAssignment(device_id=device_id, task_file=task_file))
+        assignments.append(DeviceAssignment(device_id=device_id, task_file=task_file, need_loop=need_loop))
     return assignments
