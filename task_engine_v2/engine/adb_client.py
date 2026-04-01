@@ -181,6 +181,31 @@ class ADBClient:
     def press_home(self) -> bool:
         return self._run(["shell", "input", "keyevent", "3"]).returncode == 0
 
+    def ensure_muted(self) -> bool:
+        """Try to set common audio streams to volume 0 across Android variants."""
+        commands = [
+            # Android media CLI (newer Android)
+            "media volume --stream 3 --set 0",
+            "media volume --stream 2 --set 0",
+            "media volume --stream 5 --set 0",
+            # cmd media_session fallback (some ROMs)
+            "cmd media_session volume --stream 3 --set 0",
+            # settings fallback (best-effort)
+            "settings put system volume_music 0",
+            "settings put system volume_ring 0",
+            "settings put system volume_notification 0",
+        ]
+
+        success = False
+        for shell_cmd in commands:
+            try:
+                result = self._run_shell(shell_cmd, timeout=10)
+            except Exception:
+                continue
+            if result.returncode == 0:
+                success = True
+        return success
+
     def is_screen_on(self) -> bool | None:
         # Try multiple dumpsys sources for ROM compatibility.
         power_result = self._run(["shell", "dumpsys", "power"], timeout=20)

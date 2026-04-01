@@ -19,8 +19,10 @@ class DeviceTaskScheduler:
         self.assignments_file = assignments_file
         self.adb_path = adb_path
         self.poll_interval_seconds = 3
+        self.wifi_poll_interval_seconds = 12
         # config_serial -> last successfully resolved serial (may differ after port drift)
         self._wifi_resolved: dict[str, str] = {}
+        self._wifi_stop_event = threading.Event()
 
     def run(self) -> None:
         assignments = load_assignments(self.assignments_file)
@@ -49,10 +51,17 @@ class DeviceTaskScheduler:
 
         running_threads: dict[str, threading.Thread] = {}
         handled_devices: set[str] = set()
+        wifi_thread: threading.Thread | None = None
 
         if wifi_devices:
             logger.info("scheduler connecting wifi devices | count=%s", len(wifi_devices))
-            self._connect_wifi_devices(wifi_devices)
+            wifi_thread = threading.Thread(
+                target=self._wifi_connect_loop,
+                args=(wifi_devices,),
+                name="wifi-connect-loop",
+                daemon=True,
+            )
+            wifi_thread.start()
 
         logger.info("scheduler started | watch hot-plug devices enabled")
         try:
@@ -61,9 +70,6 @@ class DeviceTaskScheduler:
                 finished = [device for device, thread in running_threads.items() if not thread.is_alive()]
                 for device in finished:
                     running_threads.pop(device, None)
-
-                if wifi_devices:
-                    self._connect_wifi_devices(wifi_devices)
 
                 connected_devices = set(self._list_connected_devices())
 
@@ -81,6 +87,9 @@ class DeviceTaskScheduler:
                     if not matched_assignments:
                         continue
 
+                    mute_ok = ADBClient(device_id=device, adb_path=self.adb_path).ensure_muted()
+                    logger.info("device connected, mute applied | device=%s | ok=%s", device, mute_ok)
+
                     thread = threading.Thread(
                         target=self._run_task_chain_for_device,
                         args=(device, matched_assignments, assignments_path),
@@ -96,6 +105,10 @@ class DeviceTaskScheduler:
                 time.sleep(self.poll_interval_seconds)
         except KeyboardInterrupt:
             logger.info("scheduler interrupted, waiting running tasks to finish")
+        finally:
+            self._wifi_stop_event.set()
+            if wifi_thread and wifi_thread.is_alive():
+                wifi_thread.join(timeout=2)
 
         for thread in running_threads.values():
             thread.join()
@@ -264,3 +277,13 @@ class DeviceTaskScheduler:
                 self._wifi_resolved[cfg.serial] = resolved
             else:
                 logger.warning("wifi device connect failed | serial=%s", cfg.serial)
+
+    def _wifi_connect_loop(self, wifi_devices: list[WifiDeviceConfig]) -> None:
+        # Run one immediate attempt, then periodic retries in background.
+        while not self._wifi_stop_event.is_set():
+            try:
+                self._connect_wifi_devices(wifi_devices)
+            except Exception:
+                logger.exception("wifi connect loop failed")
+            if self._wifi_stop_event.wait(self.wifi_poll_interval_seconds):
+                break
