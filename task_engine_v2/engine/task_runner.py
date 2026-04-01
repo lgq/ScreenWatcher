@@ -26,82 +26,90 @@ class TaskRunner:
         self._next_random_swipe_due: float | None = None
 
     def run(self) -> None:
-        logger.info("task start | device=%s | task=%s", self.device_id, self.task.name)
-        screen_ok = self.adb.ensure_screen_on()
-        logger.info("task start ensure screen on | device=%s | ok=%s", self.device_id, screen_ok)
-        if not self._run_entry():
-            logger.error("task exit because entry failed | device=%s | task=%s", self.device_id, self.task.name)
-            self._exit_to_home("entry_failed")
-            return
-
-        started = time.monotonic()
-        screenshot_dir = Path(self.task.execute.screenshot_dir) / self.device_id.replace(":", "_")
-        screenshot_dir.mkdir(parents=True, exist_ok=True)
-
-        while True:
-            elapsed = int(time.monotonic() - started)
-            if elapsed >= self.task.exit.max_duration_seconds:
-                logger.info("task exit by duration | device=%s | task=%s", self.device_id, self.task.name)
-                self._exit_to_home("duration")
+        exit_reason = "completed"
+        try:
+            logger.info("task start | device=%s | task=%s", self.device_id, self.task.name)
+            screen_ok = self.adb.ensure_screen_on()
+            logger.info("task start ensure screen on | device=%s | ok=%s", self.device_id, screen_ok)
+            if not self._run_entry():
+                exit_reason = "entry_failed"
+                logger.error("task exit because entry failed | device=%s | task=%s", self.device_id, self.task.name)
                 return
 
-            img_name = datetime.now().strftime("%Y%m%d_%H%M%S_%f") + ".png"
-            img_path = screenshot_dir / img_name
+            started = time.monotonic()
+            screenshot_dir = Path(self.task.execute.screenshot_dir) / self.device_id.replace(":", "_")
+            screenshot_dir.mkdir(parents=True, exist_ok=True)
 
-            if not self.adb.capture_screenshot(img_path):
-                logger.error("screenshot failed | device=%s | task=%s", self.device_id, self.task.name)
-                self._sleep_poll()
-                continue
+            while True:
+                elapsed = int(time.monotonic() - started)
+                if elapsed >= self.task.exit.max_duration_seconds:
+                    exit_reason = "duration"
+                    logger.info("task exit by duration | device=%s | task=%s", self.device_id, self.task.name)
+                    return
 
-            current_activity = self.adb.current_activity()
-            required = self.task.execute.required_activities
-            if required and current_activity not in required:
-                logger.error(
-                    "activity mismatch | device=%s | current=%s | expected=%s",
-                    self.device_id,
-                    current_activity,
-                    required,
-                )
-                back_ok = self.adb.press_back()
-                logger.info("activity mismatch back | device=%s | ok=%s", self.device_id, back_ok)
-                self._sleep_poll()
-                continue
+                img_name = datetime.now().strftime("%Y%m%d_%H%M%S_%f") + ".png"
+                img_path = screenshot_dir / img_name
 
-            self._try_activity_random_swipe_up(current_activity)
+                if not self.adb.capture_screenshot(img_path):
+                    logger.error("screenshot failed | device=%s | task=%s", self.device_id, self.task.name)
+                    self._sleep_poll()
+                    continue
 
-            # Scenario matching keeps line-level OCR for better recall.
-            boxes = self.ocr.extract_text_boxes(img_path)
-            screen_size = self._get_image_size(img_path)
-            scenario = find_first_matching_scenario(self.task.execute.scenarios, boxes, screen_size=screen_size)
+                current_activity = self.adb.current_activity()
+                required = self.task.execute.required_activities
+                if required and current_activity not in required:
+                    logger.error(
+                        "activity mismatch | device=%s | current=%s | expected=%s",
+                        self.device_id,
+                        current_activity,
+                        required,
+                    )
+                    back_ok = self.adb.press_back()
+                    logger.info("activity mismatch back | device=%s | ok=%s", self.device_id, back_ok)
+                    self._sleep_poll()
+                    continue
 
-            if scenario is None:
-                logger.info("no scenario matched | device=%s", self.device_id)
-                self._sleep_poll()
-                continue
+                self._try_activity_random_swipe_up(current_activity)
 
-            action_type = str(scenario.action.get("type", ""))
-            if action_type == "click_text":
-                # Click prefers word-level boxes, then falls back to line-level boxes.
-                word_boxes = self.ocr.extract_word_boxes(img_path)
-                ok = self.action_executor.execute(scenario.action, ocr_boxes=word_boxes, screen_size=screen_size)
-                if not ok:
-                    logger.info("scenario click_text fallback to line OCR | device=%s", self.device_id)
+                # Scenario matching keeps line-level OCR for better recall.
+                boxes = self.ocr.extract_text_boxes(img_path)
+                screen_size = self._get_image_size(img_path)
+                scenario = find_first_matching_scenario(self.task.execute.scenarios, boxes, screen_size=screen_size)
+
+                if scenario is None:
+                    logger.info("no scenario matched | device=%s", self.device_id)
+                    self._sleep_poll()
+                    continue
+
+                action_type = str(scenario.action.get("type", ""))
+                if action_type == "click_text":
+                    # Click prefers word-level boxes, then falls back to line-level boxes.
+                    word_boxes = self.ocr.extract_word_boxes(img_path)
+                    ok = self.action_executor.execute(scenario.action, ocr_boxes=word_boxes, screen_size=screen_size)
+                    if not ok:
+                        logger.info("scenario click_text fallback to line OCR | device=%s", self.device_id)
+                        ok = self.action_executor.execute(scenario.action, ocr_boxes=boxes, screen_size=screen_size)
+                else:
                     ok = self.action_executor.execute(scenario.action, ocr_boxes=boxes, screen_size=screen_size)
-            else:
-                ok = self.action_executor.execute(scenario.action, ocr_boxes=boxes, screen_size=screen_size)
-            logger.info(
-                "scenario matched | action=%s | ok=%s",
-                action_type,
-                ok,
-                extra={"scenario": f"scenario={scenario.name}"},
-            )
+                logger.info(
+                    "scenario matched | action=%s | ok=%s",
+                    action_type,
+                    ok,
+                    extra={"scenario": f"scenario={scenario.name}"},
+                )
 
-            if scenario.stop_task or action_type in self.task.exit.stop_on_action_types:
-                logger.info("task exit by action | device=%s | action=%s", self.device_id, action_type)
-                self._exit_to_home("action")
-                return
+                if scenario.stop_task or action_type in self.task.exit.stop_on_action_types:
+                    exit_reason = "action"
+                    logger.info("task exit by action | device=%s | action=%s", self.device_id, action_type)
+                    return
 
-            self._sleep_poll()
+                self._sleep_poll()
+        except Exception:
+            exit_reason = "exception"
+            logger.exception("task exit by exception | device=%s | task=%s", self.device_id, self.task.name)
+            raise
+        finally:
+            self._exit_to_home(exit_reason)
 
     def _run_entry(self) -> bool:
         if self.task.entry.start_from_home:
