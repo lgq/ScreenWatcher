@@ -4,8 +4,8 @@ import os
 import time
 from typing import Any, Dict, List
 
-import adb_util
-from screenwatcher.config_service import ConfigError, ConfigService
+from screenwatcher import adb_util
+from screenwatcher.core.config_service import ConfigError, ConfigService
 
 
 def _build_args() -> argparse.Namespace:
