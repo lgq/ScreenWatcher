@@ -19,7 +19,12 @@
       },
       {
         "type": "click_text",
-        "target":[ "福利","赚钱"],
+        "target": [
+          "福利",
+          "福",
+          "赚钱",
+          "赚"
+        ],
         "target_match": "or",
         "scope": "bottom",
         "check_wait_seconds": 2,
@@ -36,8 +41,25 @@
     ],
     "scenarios": [
       {
+        "name": "签到-领取",
+        "scope": "center",
+        "action": {
+          "type": "click_text",
+          "target": [
+            "立即签到",
+            "立即领取",
+            "立即打卡",
+            "去签到"
+          ],
+          "target_match": "or"
+        }
+      },
+      {
         "name": "今日签到",
-        "screen_text": ["今日签到", "立即签到"],
+        "screen_text": [
+          "今日签到",
+          "立即签到"
+        ],
         "scope": "center",
         "action": {
           "type": "click_text",
@@ -45,8 +67,23 @@
         }
       },
       {
+        "name": "天签到",
+        "screen_text": [
+          "7天签到",
+          "立即领取"
+        ],
+        "scope": "center",
+        "action": {
+          "type": "click_text",
+          "target": "立即领取"
+        }
+      },
+      {
         "name": "签到领金币",
-        "screen_text": ["签到领金币", "去签到"],
+        "screen_text": [
+          "签到领金币",
+          "去签到"
+        ],
         "action": {
           "type": "click_text",
           "target": "去签到"
@@ -54,7 +91,10 @@
       },
       {
         "name": "连续打卡7天",
-        "screen_text": ["连续打卡", "立即打卡"],
+        "screen_text": [
+          "连续打卡",
+          "立即打卡"
+        ],
         "action": {
           "type": "click_text",
           "target": "立即打卡"
@@ -64,6 +104,8 @@
   },
   "exit": {
     "max_duration_seconds": 30,
-    "stop_on_action_types": ["stop_task"]
+    "stop_on_action_types": [
+      "stop_task"
+    ]
   }
 }

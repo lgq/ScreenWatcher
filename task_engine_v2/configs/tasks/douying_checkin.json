@@ -52,6 +52,13 @@
           "type": "click_text",
           "target": "立即打卡"
         }
+      },
+      {
+        "name": "打卡-签到",
+        "action": {
+          "type": "click_text",
+          "target": ["立即打卡", "立即签到", "立即领取"]
+        }
       }
     ]
   },
