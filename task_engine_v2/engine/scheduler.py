@@ -38,7 +38,12 @@ class DeviceTaskScheduler:
                 for device in finished:
                     running_threads.pop(device, None)
 
-                for device in self._list_connected_devices():
+                connected_devices = set(self._list_connected_devices())
+
+                # A disconnected device should be eligible for a fresh schedule after reconnect.
+                handled_devices.intersection_update(connected_devices)
+
+                for device in connected_devices:
                     if device in running_threads or device in handled_devices:
                         continue
 
@@ -86,6 +91,9 @@ class DeviceTaskScheduler:
         loop_assignments = [item for item in assignments if item.need_loop]
 
         for index, assignment in enumerate(assignments, start=1):
+            if not self._is_device_connected(device_id):
+                logger.warning("task chain stop because device disconnected | device=%s", device_id)
+                return
             self._run_single_assignment(
                 device_id=device_id,
                 assignment=assignment,
@@ -100,6 +108,9 @@ class DeviceTaskScheduler:
         logger.info("task chain entering loop mode | device=%s | loop_count=%s", device_id, len(loop_assignments))
         loop_index = 0
         while True:
+            if not self._is_device_connected(device_id):
+                logger.warning("task chain loop stopped because device disconnected | device=%s", device_id)
+                return
             assignment = loop_assignments[loop_index]
             self._run_single_assignment(
                 device_id=device_id,
@@ -176,3 +187,6 @@ class DeviceTaskScheduler:
             if len(parts) >= 2 and parts[1] == "device":
                 devices.append(parts[0])
         return devices
+
+    def _is_device_connected(self, device_id: str) -> bool:
+        return device_id in self._list_connected_devices()

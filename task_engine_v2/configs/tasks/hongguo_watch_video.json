@@ -1,0 +1,43 @@
+{
+  "name": "红果免费视频-看视频",
+  "entry": {
+    "start_from_home": true,
+    "launch": {
+      "package": "com.phoenix.read",
+      "wait_seconds": 4
+    },
+    "steps": [
+      {
+        "type": "sleep",
+        "seconds": 2
+      }
+    ]
+  },
+  "execute": {
+    "poll_interval_seconds": 3,
+    "screenshot_dir": "task_engine_v2/screenshots",
+    "required_activities": [
+      "com.phoenix.read/com.dragon.read.pages.main.MainFragmentActivity"
+    ],
+    "scenarios": [],
+    "activity_random_swipe_up": {
+      "enabled": true,
+      "activities": [
+        "com.phoenix.read/com.dragon.read.pages.main.MainFragmentActivity"
+      ],
+      "interval_min_seconds": 10,
+      "interval_max_seconds": 15,
+      "start_x": 500,
+      "start_y": 800,
+      "end_x": 500,
+      "end_y": 400,
+      "duration_ms": 150
+    }
+  },
+  "exit": {
+    "max_duration_seconds": 1500,
+    "stop_on_action_types": [
+      "stop_task"
+    ]
+  }
+}

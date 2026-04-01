@@ -7,11 +7,18 @@
       "task_file": "tasks/kuaishou_checkin.json"
     },
     {
+      "task_file": "tasks/hongguo_checkin.json"
+    },
+    {
       "task_file": "tasks/douying_watch_video.json",
       "need_loop": true
     },
     {
       "task_file": "tasks/kuaishou_watch_ad.json",
+      "need_loop": true
+    },
+    {
+      "task_file": "tasks/hongguo_watch_video.json",
       "need_loop": true
     }
   ]

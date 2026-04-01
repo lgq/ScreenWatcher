@@ -5,6 +5,7 @@ from pathlib import Path
 import logging
 import random
 import time
+from typing import Any
 
 from .adb_client import ADBClient
 from .actions import ActionExecutor
@@ -29,6 +30,10 @@ class TaskRunner:
         exit_reason = "completed"
         try:
             logger.info("task start | device=%s | task=%s", self.device_id, self.task.name)
+            if not self.adb.is_device_connected():
+                exit_reason = "device_disconnected"
+                logger.warning("task exit because device disconnected | device=%s", self.device_id)
+                return
             screen_ok = self.adb.ensure_screen_on()
             logger.info("task start ensure screen on | device=%s | ok=%s", self.device_id, screen_ok)
             if not self._run_entry():
@@ -41,6 +46,11 @@ class TaskRunner:
             screenshot_dir.mkdir(parents=True, exist_ok=True)
 
             while True:
+                if not self.adb.is_device_connected():
+                    exit_reason = "device_disconnected"
+                    logger.warning("task exit because device disconnected | device=%s", self.device_id)
+                    return
+
                 elapsed = int(time.monotonic() - started)
                 if elapsed >= self.task.exit.max_duration_seconds:
                     exit_reason = "duration"
@@ -144,12 +154,23 @@ class TaskRunner:
 
     def _run_entry_step_with_retry(self, step: dict, step_index: int, max_retries: int) -> bool:
         step_type = str(step.get("type", ""))
-        target = str(step.get("target", "")).strip()
+        targets = self._normalize_targets(step.get("target", ""))
+        target_match = self._normalize_match_mode(step.get("target_match", "and"))
         scope = str(step.get("scope", "full"))
         ocr_mode = str(step.get("ocr_mode", "line")).strip().lower()
-        # logger.info(target and f"entry step | device=%s | step=%s | type=%s | target=%s" or f"entry step | device=%s | step=%s | type=%s", self.device_id, step_index, step_type, target)
+        # logger.info(targets and f"entry step | device=%s | step=%s | type=%s | targets=%s" or f"entry step | device=%s | step=%s | type=%s", self.device_id, step_index, step_type, targets)
 
         for attempt in range(1, max_retries + 1):
+            if not self.adb.is_device_connected():
+                logger.warning(
+                    "entry step stopped because device disconnected | device=%s | step=%s | attempt=%s/%s",
+                    self.device_id,
+                    step_index,
+                    attempt,
+                    max_retries,
+                )
+                return False
+
             before_boxes, screen_size = self._capture_ocr_for_entry(
                 step_index=step_index,
                 attempt=attempt,
@@ -203,13 +224,14 @@ class TaskRunner:
             #         attempt,
             #     )
 
-            if step_type == "click_text" and (not target or not self._contains_text(before_boxes, target)):
+            if step_type == "click_text" and not self._targets_satisfied(before_boxes, targets, target_match):
                 logger.warning(
-                    "entry step target not found | device=%s | step=%s | scope=%s | target=%s | attempt=%s/%s",
+                    "entry step target not found | device=%s | step=%s | scope=%s | targets=%s | match=%s | attempt=%s/%s",
                     self.device_id,
                     step_index,
                     scope,
-                    target,
+                    targets,
+                    target_match,
                     attempt,
                     max_retries,
                 )
@@ -422,6 +444,30 @@ class TaskRunner:
             if normalized_target in box.text.replace(" ", ""):
                 return True
         return False
+
+    def _targets_satisfied(self, boxes: list[OCRBox], targets: list[str], match_mode: str) -> bool:
+        if not targets:
+            return False
+        if match_mode == "or":
+            return any(self._contains_text(boxes, target) for target in targets)
+        return all(self._contains_text(boxes, target) for target in targets)
+
+    @staticmethod
+    def _normalize_targets(raw_target: Any) -> list[str]:
+        if isinstance(raw_target, str):
+            target = raw_target.strip()
+            return [target] if target else []
+        if isinstance(raw_target, list):
+            return [str(item).strip() for item in raw_target if str(item).strip()]
+        target = str(raw_target).strip()
+        return [target] if target else []
+
+    @staticmethod
+    def _normalize_match_mode(raw_mode: Any) -> str:
+        mode = str(raw_mode).strip().lower()
+        if mode == "or":
+            return "or"
+        return "and"
 
     def _sleep_poll(self) -> None:
         time.sleep(self.task.execute.poll_interval_seconds)

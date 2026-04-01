@@ -21,6 +21,21 @@ class ADBClient:
     def _run_shell(self, shell_cmd: str, timeout: int = 20) -> subprocess.CompletedProcess[str]:
         return self._run(["shell", shell_cmd], timeout=timeout)
 
+    def is_device_connected(self) -> bool:
+        cmd = [self.adb_path, "-s", self.device_id, "get-state"]
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                encoding="utf-8",
+                errors="ignore",
+            )
+        except Exception:
+            return False
+        return result.returncode == 0 and (result.stdout or "").strip() == "device"
+
     def tap(self, x: int, y: int) -> bool:
         result = self._run(["shell", "input", "tap", str(x), str(y)])
         return result.returncode == 0

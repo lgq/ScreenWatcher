@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import logging
 import time
+from typing import Any
 
 from .adb_client import ADBClient
 from .ocr_engine import OCREngine, OCRBox, filter_by_scope
@@ -69,10 +70,11 @@ class ActionExecutor:
             return True
 
         if action_type == "click_text":
-            target = str(action.get("target", "")).strip()
+            targets = self._normalize_targets(action.get("target", ""))
+            match_mode = self._normalize_match_mode(action.get("target_match", "and"))
             scope = str(action.get("scope", "full"))
             ocr_mode = str(action.get("ocr_mode", "word")).strip().lower()
-            if not target:
+            if not targets:
                 logger.error("click_text missing target")
                 return False
             candidates: list[tuple[str, list[OCRBox]]] = []
@@ -94,23 +96,26 @@ class ActionExecutor:
                 scoped = boxes
                 if apply_scope_filter:
                     scoped = filter_by_scope(boxes, scope, width=width, height=height)
-                box = self._find_box_by_text(scoped, target)
-                if box is None:
+                click_target, box = self._find_click_target(scoped, targets, match_mode)
+                if click_target is None or box is None:
                     if idx < len(candidates):
                         logger.info(
-                            "click_text fallback next OCR mode | current=%s | target=%s | scope=%s",
+                            "click_text fallback next OCR mode | current=%s | targets=%s | match=%s | scope=%s",
                             mode_name,
-                            target,
+                            targets,
+                            match_mode,
                             scope,
                         )
                     continue
 
-                x, y, est_left, est_width = self._estimate_target_center(box, target)
+                x, y, est_left, est_width = self._estimate_target_center(box, click_target)
                 logger.info(
-                    "click_text tap coords | ocr_mode=%s | scope=%s | target=%s | x=%s | y=%s | box=(%s,%s,%s,%s) | est=(left=%s,width=%s)",
+                    "click_text tap coords | ocr_mode=%s | scope=%s | target=%s | targets=%s | match=%s | x=%s | y=%s | box=(%s,%s,%s,%s) | est=(left=%s,width=%s)",
                     mode_name,
                     scope,
-                    target,
+                    click_target,
+                    targets,
+                    match_mode,
                     x,
                     y,
                     box.left,
@@ -122,7 +127,7 @@ class ActionExecutor:
                 )
                 return self.adb.tap(x, y)
 
-            logger.warning("click_text target not found: scope=%s target=%s", scope, target)
+            logger.warning("click_text target not found: scope=%s targets=%s match=%s", scope, targets, match_mode)
             return False
 
         logger.error("unsupported action type: %s", action_type)
@@ -147,6 +152,46 @@ class ActionExecutor:
             if normalized_target in box.text.replace(" ", ""):
                 return box
         return None
+
+    def _find_click_target(
+        self,
+        boxes: list[OCRBox],
+        targets: list[str],
+        match_mode: str,
+    ) -> tuple[str | None, OCRBox | None]:
+        if match_mode == "or":
+            for target in targets:
+                box = self._find_box_by_text(boxes, target)
+                if box is not None:
+                    return target, box
+            return None, None
+
+        matched_boxes: dict[str, OCRBox] = {}
+        for target in targets:
+            box = self._find_box_by_text(boxes, target)
+            if box is None:
+                return None, None
+            matched_boxes[target] = box
+
+        first_target = targets[0]
+        return first_target, matched_boxes[first_target]
+
+    @staticmethod
+    def _normalize_targets(raw_target: Any) -> list[str]:
+        if isinstance(raw_target, str):
+            target = raw_target.strip()
+            return [target] if target else []
+        if isinstance(raw_target, list):
+            return [str(item).strip() for item in raw_target if str(item).strip()]
+        target = str(raw_target).strip()
+        return [target] if target else []
+
+    @staticmethod
+    def _normalize_match_mode(raw_mode: Any) -> str:
+        mode = str(raw_mode).strip().lower()
+        if mode == "or":
+            return "or"
+        return "and"
 
     @staticmethod
     def _estimate_target_center(box: OCRBox, target: str) -> tuple[int, int, int, int]:

@@ -1,0 +1,69 @@
+{
+  "name": "红果免费视频-连续打卡",
+  "entry": {
+    "start_from_home": true,
+    "launch": {
+      "package": "com.motorola.launcher3",
+      "activity": "com.android.launcher3.CustomizationPanelLauncher",
+      "wait_seconds": 4
+    },
+    "steps": [
+      {
+        "type": "click_text",
+        "target": "红果",
+        "check_wait_seconds": 2
+      },
+      {
+        "type": "sleep",
+        "seconds": 3
+      },
+      {
+        "type": "click_text",
+        "target":[ "福利","赚钱"],
+        "target_match": "or",
+        "scope": "bottom",
+        "check_wait_seconds": 2,
+        "check": "金币收益",
+        "check_scope": "top"
+      }
+    ]
+  },
+  "execute": {
+    "poll_interval_seconds": 3,
+    "screenshot_dir": "task_engine_v2/screenshots",
+    "required_activities": [
+      "com.phoenix.read/com.dragon.read.pages.main.MainFragmentActivity"
+    ],
+    "scenarios": [
+      {
+        "name": "今日签到",
+        "screen_text": ["今日签到", "立即签到"],
+        "scope": "center",
+        "action": {
+          "type": "click_text",
+          "target": "立即签到"
+        }
+      },
+      {
+        "name": "签到领金币",
+        "screen_text": ["签到领金币", "去签到"],
+        "action": {
+          "type": "click_text",
+          "target": "去签到"
+        }
+      },
+      {
+        "name": "连续打卡7天",
+        "screen_text": ["连续打卡", "立即打卡"],
+        "action": {
+          "type": "click_text",
+          "target": "立即打卡"
+        }
+      }
+    ]
+  },
+  "exit": {
+    "max_duration_seconds": 30,
+    "stop_on_action_types": ["stop_task"]
+  }
+}

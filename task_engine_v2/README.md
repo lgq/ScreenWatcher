@@ -78,6 +78,12 @@ python task_engine_v2/run.py --assignments task_engine_v2/configs/devices.json -
 通用字段：
 
 - `type`：动作类型。
+- `target`：动作目标文本。可为字符串或字符串数组。
+  - 字符串示例：`"target": "福利"`
+  - 数组示例：`"target": ["福利", "任务"]`
+- `target_match`：可选。仅当 `target` 为数组时生效。
+  - `"and"`（默认）：数组内文本都要命中。
+  - `"or"`：数组内任意一个命中即可。
 - `scope`：识别范围（见下方 scope 定义）。
 - `ocr_mode`：OCR 粒度（`line` 或 `word`）。
 
