@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import logging
 import re
+import time
 
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,125 @@ class ADBClient:
         except Exception:
             return False
         return result.returncode == 0 and (result.stdout or "").strip() == "device"
+
+    # ------------------------------------------------------------------
+    # WiFi device helpers (static, no device_id needed)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def wifi_connect(serial: str, adb_path: str = "adb") -> bool:
+        """Run `adb connect <serial>` and return True on success."""
+        try:
+            result = subprocess.run(
+                [adb_path, "connect", serial],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                encoding="utf-8",
+                errors="ignore",
+            )
+            normalized = (result.stdout or "").lower()
+            return "connected to" in normalized or "already connected to" in normalized
+        except Exception:
+            return False
+
+    @staticmethod
+    def wifi_disconnect(serial: str, adb_path: str = "adb") -> None:
+        """Run `adb disconnect <serial>`, ignore errors."""
+        try:
+            subprocess.run(
+                [adb_path, "disconnect", serial],
+                capture_output=True,
+                timeout=5,
+            )
+        except Exception:
+            pass
+
+    @staticmethod
+    def _wifi_discover_serial(host: str, adb_path: str = "adb") -> str:
+        """Use `adb mdns services` to find host:port for the given host IP.
+
+        Handles both output formats produced by different adb versions:
+          - 'host:port'  (newer adb)
+          - 'host  port' (tab/space separated, older adb)
+        """
+        if not host:
+            return ""
+        try:
+            result = subprocess.run(
+                [adb_path, "mdns", "services"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                encoding="utf-8",
+                errors="ignore",
+            )
+        except Exception:
+            return ""
+        host_lower = host.lower()
+        for line in (result.stdout or "").splitlines():
+            if host_lower not in line.lower():
+                continue
+            # Format 1: host:port
+            match = re.search(r"([a-zA-Z0-9._-]+):(\d+)", line)
+            if match and match.group(1).lower() == host_lower:
+                return f"{match.group(1)}:{match.group(2)}"
+            # Format 2: ip<spaces/tabs>port  (IPv4 only)
+            match = re.search(r"(\d{1,3}(?:\.\d{1,3}){3})\s+(\d+)", line)
+            if match and match.group(1).lower() == host_lower:
+                return f"{match.group(1)}:{match.group(2)}"
+        return ""
+
+    @classmethod
+    def wifi_connect_with_recovery(cls, serial: str, adb_path: str = "adb") -> str:
+        """
+        连接 WiFi 设备，自动处理端口漂移。
+        返回最终可用 serial，失败返回空字符串。
+        """
+        logger.debug("wifi connect | serial=%s", serial)
+        if cls.wifi_connect(serial, adb_path):
+            return serial
+
+        host = serial.split(":", 1)[0] if ":" in serial else serial
+        logger.debug("wifi direct connect failed, starting recovery | serial=%s | host=%s", serial, host)
+        cls.wifi_disconnect(serial, adb_path)
+        cls.wifi_disconnect(host, adb_path)
+
+        # mDNS discovery with retries
+        discovered = ""
+        for attempt in range(1, 4):
+            discovered = cls._wifi_discover_serial(host, adb_path)
+            if discovered:
+                break
+            logger.debug("wifi mdns discovery attempt %s/3 found nothing | host=%s", attempt, host)
+            time.sleep(0.6)
+
+        if not discovered:
+            logger.warning("wifi mdns discovery failed | host=%s | original=%s", host, serial)
+            return ""
+
+        if discovered != serial:
+            logger.info("wifi port drift detected | original=%s | discovered=%s", serial, discovered)
+
+        cls.wifi_disconnect(discovered, adb_path)
+        if cls.wifi_connect(discovered, adb_path):
+            return discovered
+
+        logger.debug("wifi connect failed after discovery, waiting for port to stabilise | discovered=%s", discovered)
+        # One more retry after a short wait (port may still be stabilising)
+        time.sleep(1.0)
+        latest = cls._wifi_discover_serial(host, adb_path)
+        if latest and latest != discovered:
+            logger.info("wifi port drift on second discovery | prev=%s | latest=%s", discovered, latest)
+            cls.wifi_disconnect(latest, adb_path)
+            if cls.wifi_connect(latest, adb_path):
+                return latest
+
+        logger.warning(
+            "wifi connect recovery exhausted | host=%s | tried=%s | final_discovery=%s",
+            host, discovered, latest or "none",
+        )
+        return ""
 
     def tap(self, x: int, y: int) -> bool:
         result = self._run(["shell", "input", "tap", str(x), str(y)])

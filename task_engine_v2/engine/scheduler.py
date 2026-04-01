@@ -6,7 +6,8 @@ import threading
 import subprocess
 import time
 
-from .models import DeviceAssignment, load_assignments, load_task_config
+from .models import DeviceAssignment, WifiDeviceConfig, load_assignments, load_task_config, load_wifi_devices
+from .adb_client import ADBClient
 from .task_runner import TaskRunner
 
 
@@ -18,6 +19,8 @@ class DeviceTaskScheduler:
         self.assignments_file = assignments_file
         self.adb_path = adb_path
         self.poll_interval_seconds = 3
+        # config_serial -> last successfully resolved serial (may differ after port drift)
+        self._wifi_resolved: dict[str, str] = {}
 
     def run(self) -> None:
         assignments = load_assignments(self.assignments_file)
@@ -25,10 +28,15 @@ class DeviceTaskScheduler:
             logger.warning("no valid assignments found in %s", self.assignments_file)
             return
 
+        wifi_devices = load_wifi_devices(self.assignments_file)
         assignments_path = Path(self.assignments_file).resolve()
 
         running_threads: dict[str, threading.Thread] = {}
         handled_devices: set[str] = set()
+
+        if wifi_devices:
+            logger.info("scheduler connecting wifi devices | count=%s", len(wifi_devices))
+            self._connect_wifi_devices(wifi_devices)
 
         logger.info("scheduler started | watch hot-plug devices enabled")
         try:
@@ -37,6 +45,9 @@ class DeviceTaskScheduler:
                 finished = [device for device, thread in running_threads.items() if not thread.is_alive()]
                 for device in finished:
                     running_threads.pop(device, None)
+
+                if wifi_devices:
+                    self._connect_wifi_devices(wifi_devices)
 
                 connected_devices = set(self._list_connected_devices())
 
@@ -190,3 +201,50 @@ class DeviceTaskScheduler:
 
     def _is_device_connected(self, device_id: str) -> bool:
         return device_id in self._list_connected_devices()
+
+    @staticmethod
+    def _wifi_host(serial: str) -> str:
+        """Extract the IP/host part from host:port or bare host."""
+        return serial.split(":", 1)[0] if ":" in serial else serial
+
+    def _connect_wifi_devices(self, wifi_devices: list[WifiDeviceConfig]) -> None:
+        connected = set(self._list_connected_devices())
+        # Build a host -> active-serial mapping from currently connected devices
+        connected_by_host: dict[str, str] = {}
+        for s in connected:
+            connected_by_host[self._wifi_host(s)] = s
+
+        for cfg in wifi_devices:
+            if not cfg.auto_connect:
+                continue
+
+            host = self._wifi_host(cfg.serial)
+
+            # Check if the device is already online (possibly with a different port)
+            if host in connected_by_host:
+                active_serial = connected_by_host[host]
+                prev_resolved = self._wifi_resolved.get(cfg.serial, cfg.serial)
+                if active_serial != prev_resolved:
+                    logger.info(
+                        "wifi device port changed | config=%s | old=%s | new=%s",
+                        cfg.serial, prev_resolved, active_serial,
+                    )
+                    self._wifi_resolved[cfg.serial] = active_serial
+                continue
+
+            # Device is not online — attempt connection with port-drift recovery
+            # Use last known resolved serial as the starting hint so the direct
+            # connect attempt is more likely to succeed after a port change.
+            hint_serial = self._wifi_resolved.get(cfg.serial, cfg.serial)
+            resolved = ADBClient.wifi_connect_with_recovery(hint_serial, self.adb_path)
+            if resolved:
+                if resolved != cfg.serial:
+                    logger.info(
+                        "wifi device connected with port recovery | config=%s | resolved=%s",
+                        cfg.serial, resolved,
+                    )
+                else:
+                    logger.info("wifi device connected | serial=%s", resolved)
+                self._wifi_resolved[cfg.serial] = resolved
+            else:
+                logger.warning("wifi device connect failed | serial=%s", cfg.serial)

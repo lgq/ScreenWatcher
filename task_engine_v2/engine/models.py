@@ -52,6 +52,12 @@ class DeviceAssignment:
     need_loop: bool = False
 
 
+@dataclass(slots=True)
+class WifiDeviceConfig:
+    serial: str          # host:port，例如 192.168.1.100:5555
+    auto_connect: bool = True
+
+
 def _parse_scenarios(raw_scenarios: list[dict[str, Any]]) -> list[ScenarioConfig]:
     scenarios: list[ScenarioConfig] = []
     for item in raw_scenarios:
@@ -110,3 +116,16 @@ def load_assignments(path: str | Path) -> list[DeviceAssignment]:
             continue
         assignments.append(DeviceAssignment(device_id=device_id, task_file=task_file, need_loop=need_loop))
     return assignments
+
+
+def load_wifi_devices(path: str | Path) -> list[WifiDeviceConfig]:
+    file_path = Path(path)
+    data = json.loads(file_path.read_text(encoding="utf-8"))
+    wifi_devices: list[WifiDeviceConfig] = []
+    for item in data.get("wifi_devices", []):
+        serial = str(item.get("serial", "")).strip()
+        if not serial:
+            continue
+        auto_connect = bool(item.get("auto_connect", True))
+        wifi_devices.append(WifiDeviceConfig(serial=serial, auto_connect=auto_connect))
+    return wifi_devices

@@ -1,4 +1,8 @@
 {
+  "wifi_devices": [
+    { "serial": "192.168.0.130:42379" },
+    { "serial": "192.168.0.131:37033" }
+  ],
   "assignments": [
     {
       "task_file": "tasks/douying_checkin.json"
