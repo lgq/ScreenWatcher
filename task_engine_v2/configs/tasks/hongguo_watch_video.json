@@ -35,7 +35,7 @@
     }
   },
   "exit": {
-    "max_duration_seconds": 1500,
+    "max_duration_seconds": 1200,
     "stop_on_action_types": [
       "stop_task"
     ]
