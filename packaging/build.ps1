@@ -1,19 +1,32 @@
 param(
     [string]$Version = "1.0.0",
     [switch]$SkipInstaller,
-    [switch]$SkipPlatformToolsDownload
+    [switch]$SkipPlatformToolsDownload,
+    # ScreenWatcher | TaskEngine | All
+    [ValidateSet("ScreenWatcher", "TaskEngine", "All")]
+    [string]$Target = "All"
 )
 
 $ErrorActionPreference = "Stop"
 
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $BuildRoot = Join-Path $ProjectRoot "build"
-$StagingRoot = Join-Path $BuildRoot "staging"
-$DefaultsRoot = Join-Path $StagingRoot "defaults"
-$PlatformToolsRoot = Join-Path $StagingRoot "platform-tools"
-$DistRoot = Join-Path $ProjectRoot "dist"
-$SpecPath = Join-Path $PSScriptRoot "ScreenWatcher.spec"
-$InstallerScript = Join-Path $PSScriptRoot "ScreenWatcher.iss"
+
+# ---- ScreenWatcher staging paths ----
+$StagingRoot        = Join-Path $BuildRoot "staging"
+$DefaultsRoot       = Join-Path $StagingRoot "defaults"
+$PlatformToolsRoot  = Join-Path $StagingRoot "platform-tools"
+$DistRoot           = Join-Path $ProjectRoot "dist"
+
+# ---- TaskEngine staging paths ----
+$TEStagingRoot      = Join-Path $BuildRoot "staging-taskengine"
+$TEDefaultsRoot     = Join-Path $TEStagingRoot "defaults"
+
+# ---- Spec / Iss paths ----
+$SpecPath           = Join-Path $PSScriptRoot "ScreenWatcher.spec"
+$InstallerScript    = Join-Path $PSScriptRoot "ScreenWatcher.iss"
+$TESpecPath         = Join-Path $PSScriptRoot "TaskEngine.spec"
+$TEInstallerScript  = Join-Path $PSScriptRoot "TaskEngine.iss"
 
 function Get-PythonExe {
     $venvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
@@ -55,14 +68,28 @@ function Invoke-Python {
 }
 
 function Reset-BuildFolders {
-    foreach ($path in @($StagingRoot, $DistRoot)) {
-        if (Test-Path $path) {
-            Remove-Item $path -Recurse -Force
-        }
+    param([string]$AppTarget)
+
+    if (-not (Test-Path $DistRoot)) {
+        New-Item -ItemType Directory -Force -Path $DistRoot | Out-Null
     }
 
-    New-Item -ItemType Directory -Force -Path $DefaultsRoot | Out-Null
-    New-Item -ItemType Directory -Force -Path $PlatformToolsRoot | Out-Null
+    if ($AppTarget -eq "ScreenWatcher" -or $AppTarget -eq "All") {
+        if (Test-Path $StagingRoot) { Remove-Item $StagingRoot -Recurse -Force }
+        New-Item -ItemType Directory -Force -Path $DefaultsRoot      | Out-Null
+        New-Item -ItemType Directory -Force -Path $PlatformToolsRoot | Out-Null
+    }
+
+    if ($AppTarget -eq "TaskEngine" -or $AppTarget -eq "All") {
+        if (Test-Path $TEStagingRoot) { Remove-Item $TEStagingRoot -Recurse -Force }
+        New-Item -ItemType Directory -Force -Path $TEDefaultsRoot | Out-Null
+
+        # TaskEngine shares platform-tools staging with ScreenWatcher.
+        # If only building TaskEngine, still ensure the folder exists.
+        if (-not (Test-Path $PlatformToolsRoot)) {
+            New-Item -ItemType Directory -Force -Path $PlatformToolsRoot | Out-Null
+        }
+    }
 }
 
 function Copy-DefaultConfigs {
@@ -80,6 +107,13 @@ function Copy-DefaultConfigs {
     $appConfigs = Join-Path $ProjectRoot "app_configs"
     if (Test-Path $appConfigs) {
         Copy-Item $appConfigs (Join-Path $DefaultsRoot "app_configs") -Recurse -Force
+    }
+}
+
+function Copy-TaskEngineDefaultConfigs {
+    $teConfigs = Join-Path $ProjectRoot "task_engine_v2\configs"
+    if (Test-Path $teConfigs) {
+        Copy-Item (Join-Path $teConfigs "*") $TEDefaultsRoot -Recurse -Force
     }
 }
 
@@ -134,10 +168,17 @@ function Ensure-BuildDependencies {
 }
 
 function Build-PyInstaller {
-    param([hashtable]$PythonInfo)
+    param([hashtable]$PythonInfo, [string]$AppTarget)
 
-    Write-Host "Running PyInstaller..."
-    Invoke-Python -PythonInfo $PythonInfo -Arguments @("-m", "PyInstaller", "--noconfirm", "--clean", $SpecPath)
+    if ($AppTarget -eq "ScreenWatcher" -or $AppTarget -eq "All") {
+        Write-Host "Running PyInstaller for ScreenWatcher..."
+        Invoke-Python -PythonInfo $PythonInfo -Arguments @("-m", "PyInstaller", "--noconfirm", "--clean", $SpecPath)
+    }
+
+    if ($AppTarget -eq "TaskEngine" -or $AppTarget -eq "All") {
+        Write-Host "Running PyInstaller for TaskEngine..."
+        Invoke-Python -PythonInfo $PythonInfo -Arguments @("-m", "PyInstaller", "--noconfirm", "--clean", $TESpecPath)
+    }
 }
 
 function Find-ISCC {
@@ -161,29 +202,45 @@ function Find-ISCC {
 }
 
 function Build-Installer {
+    param([string]$AppTarget)
+
     $iscc = Find-ISCC
     if (-not $iscc) {
         throw "ISCC.exe was not found. Install Inno Setup 6 first."
     }
 
-    Write-Host "Running Inno Setup..."
-    & $iscc "/DAppVersion=$Version" $InstallerScript
-    if ($LASTEXITCODE -ne 0) {
-        throw "Inno Setup failed with exit code $LASTEXITCODE"
+    if ($AppTarget -eq "ScreenWatcher" -or $AppTarget -eq "All") {
+        Write-Host "Running Inno Setup for ScreenWatcher..."
+        & $iscc "/DAppVersion=$Version" $InstallerScript
+        if ($LASTEXITCODE -ne 0) { throw "Inno Setup (ScreenWatcher) failed with exit code $LASTEXITCODE" }
+    }
+
+    if ($AppTarget -eq "TaskEngine" -or $AppTarget -eq "All") {
+        Write-Host "Running Inno Setup for TaskEngine..."
+        & $iscc "/DAppVersion=$Version" $TEInstallerScript
+        if ($LASTEXITCODE -ne 0) { throw "Inno Setup (TaskEngine) failed with exit code $LASTEXITCODE" }
     }
 }
 
 $pythonInfo = Get-PythonExe
 Write-Host "Using Python: $($pythonInfo.Path)"
+Write-Host "Build target: $Target"
 
-Reset-BuildFolders
-Copy-DefaultConfigs
+Reset-BuildFolders -AppTarget $Target
+
+if ($Target -eq "ScreenWatcher" -or $Target -eq "All") {
+    Copy-DefaultConfigs
+}
+if ($Target -eq "TaskEngine" -or $Target -eq "All") {
+    Copy-TaskEngineDefaultConfigs
+}
+
 Ensure-PlatformTools
 Ensure-BuildDependencies -PythonInfo $pythonInfo
-Build-PyInstaller -PythonInfo $pythonInfo
+Build-PyInstaller -PythonInfo $pythonInfo -AppTarget $Target
 
 if (-not $SkipInstaller) {
-    Build-Installer
+    Build-Installer -AppTarget $Target
 }
 
 Write-Host "Build finished. Dist directory: $DistRoot"
