@@ -534,11 +534,25 @@ class TaskRunner:
         )
 
     def _resolve_exit_package(self, exit_activity: str) -> str:
+        if "/" in exit_activity:
+            activity_package = exit_activity.split("/", 1)[0].strip()
+            if activity_package and not self._is_launcher_package(activity_package):
+                return activity_package
+
         launch = self.task.entry.launch or {}
         launch_package = str(launch.get("package", "")).strip()
-        if launch_package:
+        if launch_package and not self._is_launcher_package(launch_package):
             return launch_package
 
-        if "/" in exit_activity:
-            return exit_activity.split("/", 1)[0].strip()
         return ""
+
+    @staticmethod
+    def _is_launcher_package(package: str) -> bool:
+        p = package.lower()
+        return (
+            "launcher" in p
+            or p in {
+                "com.android.systemui",
+                "com.google.android.apps.nexuslauncher",
+            }
+        )
