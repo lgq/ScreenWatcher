@@ -10,7 +10,8 @@
     "steps": [
       {
         "type": "click_text",
-        "target": "赚钱助手",
+        "target": ["赚钱助手","助手"],
+        "target_match": "or",
         "check_wait_seconds": 2
       },
       {
