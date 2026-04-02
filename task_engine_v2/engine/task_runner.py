@@ -36,6 +36,19 @@ class TaskRunner:
         exit_reason = "completed"
         try:
             logger.info("task start | device=%s | task=%s", self.device_id, self.task.name)
+            
+            # Check if current time is within allowed hours
+            if not self._is_within_allowed_hours():
+                exit_reason = "not_in_allowed_hours"
+                logger.warning(
+                    "task exit because current time not in allowed range | device=%s | task=%s | allowed_hours=%s-%s",
+                    self.device_id,
+                    self.task.name,
+                    self.task.execute.allow_start_hour,
+                    self.task.execute.allow_end_hour,
+                )
+                return
+            
             if not self.adb.is_device_connected():
                 exit_reason = "device_disconnected"
                 logger.warning("task exit because device disconnected | device=%s", self.device_id)
@@ -580,3 +593,20 @@ class TaskRunner:
             pass
         except Exception:
             logger.debug("skip deleting runtime screenshot: %s", path, exc_info=True)
+
+    def _is_within_allowed_hours(self) -> bool:
+        """Check if current time is within the allowed execution hours."""
+        current_hour = datetime.now().hour
+        start_hour = self.task.execute.allow_start_hour
+        end_hour = self.task.execute.allow_end_hour
+        
+        # Both are on the same day or wrapping midnight
+        if start_hour < end_hour:
+            # Normal case: e.g., 7-24 or 9-17
+            return start_hour <= current_hour < end_hour
+        elif start_hour > end_hour:
+            # Wrapping midnight: e.g., 22-6 (10 PM to 6 AM)
+            return current_hour >= start_hour or current_hour < end_hour
+        else:
+            # start_hour == end_hour, all day allowed
+            return True

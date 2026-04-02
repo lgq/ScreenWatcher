@@ -12,6 +12,8 @@
     "poll_interval_seconds": 8,
     "screenshot_dir": "task_engine_v2/screenshots",
     "save_screenshots": false,
+    "allow_start_hour": 7,
+    "allow_end_hour": 24,
     "required_activities": [],
     "scenarios": [
       {

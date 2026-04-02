@@ -30,6 +30,8 @@ class ExecuteConfig:
     save_screenshots: bool = False
     scenarios: list[ScenarioConfig] = field(default_factory=list)
     activity_random_swipe_up: dict[str, Any] = field(default_factory=dict)
+    allow_start_hour: int = 0
+    allow_end_hour: int = 24
 
 
 @dataclass(slots=True)
@@ -95,6 +97,8 @@ def load_task_config(path: str | Path) -> TaskConfig:
         save_screenshots=bool(execute_data.get("save_screenshots", False)),
         scenarios=_parse_scenarios(execute_data.get("scenarios", [])),
         activity_random_swipe_up=dict(execute_data.get("activity_random_swipe_up", {})),
+        allow_start_hour=max(0, min(24, int(execute_data.get("allow_start_hour", 0)))),
+        allow_end_hour=max(0, min(24, int(execute_data.get("allow_end_hour", 24)))),
     )
 
     exit_cfg = ExitConfig(

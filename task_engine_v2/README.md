@@ -79,6 +79,10 @@ python task_engine_v2/run.py --assignments task_engine_v2/configs/devices.json -
 - `save_screenshots`：是否保留运行截图，默认 `false`。
   - `false`：截图仅用于 OCR/匹配，使用后自动删除。
   - `true`：保留运行截图，便于排查问题。
+- `allow_start_hour` 和 `allow_end_hour`：任务运行的允许时间范围，默认 `0` 到 `24`（全天）。
+  - 使用 24 小时制。例如：上午 7 点到晚上 12 点，设置为 `"allow_start_hour": 7, "allow_end_hour": 24`。
+  - 支持跨午夜的时间范围：例如晚上 10 点到早上 6 点，设置为 `"allow_start_hour": 22, "allow_end_hour": 6`。
+  - 如果超出允许时间范围，任务会立即退出。
 
 ### 5.3 entry.steps 新增字段
 

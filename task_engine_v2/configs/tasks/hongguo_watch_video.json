@@ -16,6 +16,8 @@
   "execute": {
     "poll_interval_seconds": 3,
     "screenshot_dir": "task_engine_v2/screenshots",
+    "allow_start_hour": 7,
+    "allow_end_hour": 24,
     "required_activities": [
       "com.phoenix.read/com.dragon.read.pages.main.MainFragmentActivity"
     ],
