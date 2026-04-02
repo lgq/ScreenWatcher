@@ -54,8 +54,17 @@ class ADBClient:
                 errors="ignore",
             )
             normalized = (result.stdout or "").lower()
-            return "connected to" in normalized or "already connected to" in normalized
+            ok = "connected to" in normalized or "already connected to" in normalized
+            if not ok:
+                logger.debug(
+                    "wifi connect failed | serial=%s | stdout=%s | stderr=%s",
+                    serial,
+                    (result.stdout or "").strip(),
+                    (result.stderr or "").strip(),
+                )
+            return ok
         except Exception:
+            logger.debug("wifi connect command exception | serial=%s", serial, exc_info=True)
             return False
 
     @staticmethod
@@ -72,6 +81,11 @@ class ADBClient:
 
     @staticmethod
     def _wifi_discover_serial(host: str, adb_path: str = "adb") -> str:
+        candidates = ADBClient._wifi_discover_serial_candidates(host, adb_path)
+        return candidates[0] if candidates else ""
+
+    @staticmethod
+    def _wifi_discover_serial_candidates(host: str, adb_path: str = "adb") -> list[str]:
         """Use `adb mdns services` to find host:port for the given host IP.
 
         Handles both output formats produced by different adb versions:
@@ -79,7 +93,7 @@ class ADBClient:
           - 'host  port' (tab/space separated, older adb)
         """
         if not host:
-            return ""
+            return []
         try:
             result = subprocess.run(
                 [adb_path, "mdns", "services"],
@@ -90,20 +104,42 @@ class ADBClient:
                 errors="ignore",
             )
         except Exception:
-            return ""
+            return []
         host_lower = host.lower()
+        connect_candidates: list[str] = []
+        fallback_candidates: list[str] = []
+        seen: set[str] = set()
         for line in (result.stdout or "").splitlines():
             if host_lower not in line.lower():
                 continue
+            line_lower = line.lower()
+            discovered = ""
             # Format 1: host:port
             match = re.search(r"([a-zA-Z0-9._-]+):(\d+)", line)
             if match and match.group(1).lower() == host_lower:
-                return f"{match.group(1)}:{match.group(2)}"
+                discovered = f"{match.group(1)}:{match.group(2)}"
             # Format 2: ip<spaces/tabs>port  (IPv4 only)
-            match = re.search(r"(\d{1,3}(?:\.\d{1,3}){3})\s+(\d+)", line)
-            if match and match.group(1).lower() == host_lower:
-                return f"{match.group(1)}:{match.group(2)}"
-        return ""
+            if not discovered:
+                match = re.search(r"(\d{1,3}(?:\.\d{1,3}){3})\s+(\d+)", line)
+                if match and match.group(1).lower() == host_lower:
+                    discovered = f"{match.group(1)}:{match.group(2)}"
+
+            if not discovered:
+                continue
+
+            # Prefer adb connect service; skip pairing service.
+            if "pair" in line_lower:
+                continue
+            if "adb-tls-connect" in line_lower or "_adb._tcp" in line_lower:
+                if discovered not in seen:
+                    connect_candidates.append(discovered)
+                    seen.add(discovered)
+            else:
+                if discovered not in seen:
+                    fallback_candidates.append(discovered)
+                    seen.add(discovered)
+
+        return connect_candidates + fallback_candidates
 
     @classmethod
     def wifi_connect_with_recovery(cls, serial: str, adb_path: str = "adb") -> str:
@@ -121,38 +157,56 @@ class ADBClient:
         cls.wifi_disconnect(host, adb_path)
 
         # mDNS discovery with retries
-        discovered = ""
+        discovered_candidates: list[str] = []
         for attempt in range(1, 4):
-            discovered = cls._wifi_discover_serial(host, adb_path)
-            if discovered:
+            discovered_candidates = cls._wifi_discover_serial_candidates(host, adb_path)
+            if discovered_candidates:
                 break
             logger.debug("wifi mdns discovery attempt %s/3 found nothing | host=%s", attempt, host)
             time.sleep(0.6)
 
-        if not discovered:
+        if not discovered_candidates:
             logger.warning("wifi mdns discovery failed | host=%s | original=%s", host, serial)
             return ""
 
-        if discovered != serial:
-            logger.info("wifi port drift detected | original=%s | discovered=%s", serial, discovered)
+        primary = discovered_candidates[0]
+        if primary != serial:
+            logger.info("wifi port drift detected | original=%s | discovered=%s", serial, primary)
 
-        cls.wifi_disconnect(discovered, adb_path)
-        if cls.wifi_connect(discovered, adb_path):
-            return discovered
+        tried: list[str] = []
+        for candidate in discovered_candidates:
+            tried.append(candidate)
+            cls.wifi_disconnect(candidate, adb_path)
+            if cls.wifi_connect(candidate, adb_path):
+                return candidate
 
-        logger.debug("wifi connect failed after discovery, waiting for port to stabilise | discovered=%s", discovered)
+        logger.debug(
+            "wifi connect failed after discovery candidates, waiting for port to stabilise | host=%s | candidates=%s",
+            host,
+            discovered_candidates,
+        )
         # One more retry after a short wait (port may still be stabilising)
         time.sleep(1.0)
-        latest = cls._wifi_discover_serial(host, adb_path)
-        if latest and latest != discovered:
-            logger.info("wifi port drift on second discovery | prev=%s | latest=%s", discovered, latest)
-            cls.wifi_disconnect(latest, adb_path)
-            if cls.wifi_connect(latest, adb_path):
-                return latest
+        latest_candidates = cls._wifi_discover_serial_candidates(host, adb_path)
+        if latest_candidates and latest_candidates != discovered_candidates:
+            logger.info(
+                "wifi port drift on second discovery | prev=%s | latest=%s",
+                discovered_candidates,
+                latest_candidates,
+            )
+        for candidate in latest_candidates:
+            if candidate in tried:
+                continue
+            tried.append(candidate)
+            cls.wifi_disconnect(candidate, adb_path)
+            if cls.wifi_connect(candidate, adb_path):
+                return candidate
 
         logger.warning(
             "wifi connect recovery exhausted | host=%s | tried=%s | final_discovery=%s",
-            host, discovered, latest or "none",
+            host,
+            tried or "none",
+            latest_candidates or discovered_candidates or "none",
         )
         return ""
 
