@@ -27,6 +27,7 @@ class ExecuteConfig:
     poll_interval_seconds: int = 5
     required_activities: list[str] = field(default_factory=list)
     screenshot_dir: str = "task_engine_v2/screenshots"
+    save_screenshots: bool = False
     scenarios: list[ScenarioConfig] = field(default_factory=list)
     activity_random_swipe_up: dict[str, Any] = field(default_factory=dict)
 
@@ -91,6 +92,7 @@ def load_task_config(path: str | Path) -> TaskConfig:
         poll_interval_seconds=max(1, int(execute_data.get("poll_interval_seconds", 5))),
         required_activities=[str(x) for x in execute_data.get("required_activities", [])],
         screenshot_dir=str(execute_data.get("screenshot_dir", "task_engine_v2/screenshots")),
+        save_screenshots=bool(execute_data.get("save_screenshots", False)),
         scenarios=_parse_scenarios(execute_data.get("scenarios", [])),
         activity_random_swipe_up=dict(execute_data.get("activity_random_swipe_up", {})),
     )

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 import logging
+import os
 import random
 import time
 from typing import Any
@@ -23,7 +24,12 @@ class TaskRunner:
         self.task = task
         self.adb = ADBClient(device_id=device_id, adb_path=adb_path)
         self.ocr = OCREngine()
-        self.action_executor = ActionExecutor(self.adb, self.ocr, screenshot_dir=task.execute.screenshot_dir)
+        self.action_executor = ActionExecutor(
+            self.adb,
+            self.ocr,
+            screenshot_dir=task.execute.screenshot_dir,
+            save_screenshots=task.execute.save_screenshots,
+        )
         self._next_random_swipe_due: float | None = None
 
     def run(self) -> None:
@@ -64,56 +70,59 @@ class TaskRunner:
                     logger.error("screenshot failed | device=%s | task=%s", self.device_id, self.task.name)
                     self._sleep_poll()
                     continue
+                try:
+                    current_activity = self.adb.current_activity()
+                    required = self.task.execute.required_activities
+                    if required and current_activity not in required:
+                        logger.error(
+                            "activity mismatch | device=%s | current=%s | expected=%s",
+                            self.device_id,
+                            current_activity,
+                            required,
+                        )
+                        back_ok = self.adb.press_back()
+                        logger.info("activity mismatch back | device=%s | ok=%s", self.device_id, back_ok)
+                        self._sleep_poll()
+                        continue
 
-                current_activity = self.adb.current_activity()
-                required = self.task.execute.required_activities
-                if required and current_activity not in required:
-                    logger.error(
-                        "activity mismatch | device=%s | current=%s | expected=%s",
-                        self.device_id,
-                        current_activity,
-                        required,
-                    )
-                    back_ok = self.adb.press_back()
-                    logger.info("activity mismatch back | device=%s | ok=%s", self.device_id, back_ok)
-                    self._sleep_poll()
-                    continue
+                    self._try_activity_random_swipe_up(current_activity)
 
-                self._try_activity_random_swipe_up(current_activity)
+                    # Scenario matching keeps line-level OCR for better recall.
+                    boxes = self.ocr.extract_text_boxes(img_path)
+                    screen_size = self._get_image_size(img_path)
+                    scenario = find_first_matching_scenario(self.task.execute.scenarios, boxes, screen_size=screen_size)
 
-                # Scenario matching keeps line-level OCR for better recall.
-                boxes = self.ocr.extract_text_boxes(img_path)
-                screen_size = self._get_image_size(img_path)
-                scenario = find_first_matching_scenario(self.task.execute.scenarios, boxes, screen_size=screen_size)
+                    if scenario is None:
+                        logger.info("no scenario matched | device=%s", self.device_id)
+                        self._sleep_poll()
+                        continue
 
-                if scenario is None:
-                    logger.info("no scenario matched | device=%s", self.device_id)
-                    self._sleep_poll()
-                    continue
-
-                action_type = str(scenario.action.get("type", ""))
-                if action_type == "click_text":
-                    # Click prefers word-level boxes, then falls back to line-level boxes.
-                    word_boxes = self.ocr.extract_word_boxes(img_path)
-                    ok = self.action_executor.execute(scenario.action, ocr_boxes=word_boxes, screen_size=screen_size)
-                    if not ok:
-                        logger.info("scenario click_text fallback to line OCR | device=%s", self.device_id)
+                    action_type = str(scenario.action.get("type", ""))
+                    if action_type == "click_text":
+                        # Click prefers word-level boxes, then falls back to line-level boxes.
+                        word_boxes = self.ocr.extract_word_boxes(img_path)
+                        ok = self.action_executor.execute(scenario.action, ocr_boxes=word_boxes, screen_size=screen_size)
+                        if not ok:
+                            logger.info("scenario click_text fallback to line OCR | device=%s", self.device_id)
+                            ok = self.action_executor.execute(scenario.action, ocr_boxes=boxes, screen_size=screen_size)
+                    else:
                         ok = self.action_executor.execute(scenario.action, ocr_boxes=boxes, screen_size=screen_size)
-                else:
-                    ok = self.action_executor.execute(scenario.action, ocr_boxes=boxes, screen_size=screen_size)
-                logger.info(
-                    "scenario matched | action=%s | ok=%s",
-                    action_type,
-                    ok,
-                    extra={"scenario": f"scenario={scenario.name}"},
-                )
+                    logger.info(
+                        "scenario matched | action=%s | ok=%s",
+                        action_type,
+                        ok,
+                        extra={"scenario": f"scenario={scenario.name}"},
+                    )
 
-                if scenario.stop_task or action_type in self.task.exit.stop_on_action_types:
-                    exit_reason = "action"
-                    logger.info("task exit by action | device=%s | action=%s", self.device_id, action_type)
-                    return
+                    if scenario.stop_task or action_type in self.task.exit.stop_on_action_types:
+                        exit_reason = "action"
+                        logger.info("task exit by action | device=%s | action=%s", self.device_id, action_type)
+                        return
 
-                self._sleep_poll()
+                    self._sleep_poll()
+                finally:
+                    if not self.task.execute.save_screenshots:
+                        self._safe_unlink(img_path)
         except Exception:
             exit_reason = "exception"
             logger.exception("task exit by exception | device=%s | task=%s", self.device_id, self.task.name)
@@ -352,32 +361,38 @@ class TaskRunner:
         screenshot_dir.mkdir(parents=True, exist_ok=True)
         img_name = datetime.now().strftime("%Y%m%d_%H%M%S_%f") + f"_step{step_index}_{phase}_{attempt}.png"
         img_path = screenshot_dir / img_name
+        crop_path: Path | None = None
 
         if not self.adb.capture_screenshot(img_path):
             return None, None
+        try:
+            screen_size = self._get_image_size(img_path)
 
-        screen_size = self._get_image_size(img_path)
+            if scope == "full":
+                return self._extract_boxes_with_mode(img_path, ocr_mode), screen_size
 
-        if scope == "full":
-            return self._extract_boxes_with_mode(img_path, ocr_mode), screen_size
+            # Scope-first strategy for entry: crop image first, then OCR.
+            crop_path, offset = self._crop_image_by_scope(img_path=img_path, scope=scope)
+            if crop_path is None:
+                return self._extract_boxes_with_mode(img_path, ocr_mode), screen_size
 
-        # Scope-first strategy for entry: crop image first, then OCR.
-        crop_path, offset = self._crop_image_by_scope(img_path=img_path, scope=scope)
-        if crop_path is None:
-            return self._extract_boxes_with_mode(img_path, ocr_mode), screen_size
-
-        cropped_boxes = self._extract_boxes_with_mode(crop_path, ocr_mode)
-        offset_x, offset_y = offset
-        return [
-            OCRBox(
-                text=box.text,
-                left=box.left + offset_x,
-                top=box.top + offset_y,
-                width=box.width,
-                height=box.height,
-            )
-            for box in cropped_boxes
-        ], screen_size
+            cropped_boxes = self._extract_boxes_with_mode(crop_path, ocr_mode)
+            offset_x, offset_y = offset
+            return [
+                OCRBox(
+                    text=box.text,
+                    left=box.left + offset_x,
+                    top=box.top + offset_y,
+                    width=box.width,
+                    height=box.height,
+                )
+                for box in cropped_boxes
+            ], screen_size
+        finally:
+            if not self.task.execute.save_screenshots:
+                if crop_path is not None:
+                    self._safe_unlink(crop_path)
+                self._safe_unlink(img_path)
 
     @staticmethod
     def _get_image_size(img_path: Path) -> tuple[int, int] | None:
@@ -556,3 +571,12 @@ class TaskRunner:
                 "com.google.android.apps.nexuslauncher",
             }
         )
+
+    @staticmethod
+    def _safe_unlink(path: Path) -> None:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+        except Exception:
+            logger.debug("skip deleting runtime screenshot: %s", path, exc_info=True)

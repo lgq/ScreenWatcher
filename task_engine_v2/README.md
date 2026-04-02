@@ -73,6 +73,13 @@ python task_engine_v2/run.py --assignments task_engine_v2/configs/devices.json -
 - `execute`：循环执行参数（截图周期、activity、scenarios）。
 - `exit`：退出条件（最长时长、动作触发）。
 
+`execute` 关键字段补充：
+
+- `screenshot_dir`：截图目录。
+- `save_screenshots`：是否保留运行截图，默认 `false`。
+  - `false`：截图仅用于 OCR/匹配，使用后自动删除。
+  - `true`：保留运行截图，便于排查问题。
+
 ### 5.3 entry.steps 新增字段
 
 通用字段：

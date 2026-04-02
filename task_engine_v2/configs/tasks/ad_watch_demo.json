@@ -11,6 +11,7 @@
   "execute": {
     "poll_interval_seconds": 8,
     "screenshot_dir": "task_engine_v2/screenshots",
+    "save_screenshots": false,
     "required_activities": [],
     "scenarios": [
       {

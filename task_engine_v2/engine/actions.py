@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import logging
 import time
 from typing import Any
@@ -13,10 +14,11 @@ logger = logging.getLogger(__name__)
 
 
 class ActionExecutor:
-    def __init__(self, adb: ADBClient, ocr: OCREngine, screenshot_dir: str) -> None:
+    def __init__(self, adb: ADBClient, ocr: OCREngine, screenshot_dir: str, save_screenshots: bool = False) -> None:
         self.adb = adb
         self.ocr = ocr
         self.screenshot_dir = Path(screenshot_dir)
+        self.save_screenshots = save_screenshots
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)
 
     def execute(
@@ -155,13 +157,30 @@ class ActionExecutor:
         temp_img = self.screenshot_dir / "_tmp_action_ocr.png"
         if not self.adb.capture_screenshot(temp_img):
             return []
-        return self.ocr.extract_text_boxes(temp_img)
+        try:
+            return self.ocr.extract_text_boxes(temp_img)
+        finally:
+            if not self.save_screenshots:
+                self._safe_unlink(temp_img)
 
     def _capture_and_ocr_words(self) -> list[OCRBox]:
         temp_img = self.screenshot_dir / "_tmp_action_ocr_words.png"
         if not self.adb.capture_screenshot(temp_img):
             return []
-        return self.ocr.extract_word_boxes(temp_img)
+        try:
+            return self.ocr.extract_word_boxes(temp_img)
+        finally:
+            if not self.save_screenshots:
+                self._safe_unlink(temp_img)
+
+    @staticmethod
+    def _safe_unlink(path: Path) -> None:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+        except Exception:
+            logger.debug("skip deleting temp screenshot: %s", path, exc_info=True)
 
     @staticmethod
     def _find_box_by_text(boxes: list[OCRBox], target: str) -> OCRBox | None:
