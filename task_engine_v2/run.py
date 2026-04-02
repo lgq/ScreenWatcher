@@ -83,13 +83,23 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--adb-path", default=_get_default_adb_path(), help="adb executable path")
     parser.add_argument("--log-level", default="INFO", help="DEBUG/INFO/WARNING/ERROR")
+    parser.add_argument(
+        "--daily-reschedule-hour",
+        type=int,
+        default=7,
+        help="Daily reschedule trigger hour in 24h format (default: 7)",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     setup_logging(args.log_level)
-    scheduler = DeviceTaskScheduler(assignments_file=args.assignments, adb_path=args.adb_path)
+    scheduler = DeviceTaskScheduler(
+        assignments_file=args.assignments,
+        adb_path=args.adb_path,
+        daily_reschedule_hour=args.daily_reschedule_hour,
+    )
     scheduler.run()
 
 

@@ -36,6 +36,10 @@ pip install -r task_engine_v2/requirements.txt
 python task_engine_v2/run.py --assignments task_engine_v2/configs/devices.json --log-level INFO
 ```
 
+可选参数：
+
+- `--daily-reschedule-hour`：每天触发一次“重新调度”的小时（24 小时制，默认 `7`）。
+
 ## 5. 配置说明
 
 ### 5.1 assignments（设备映射）
@@ -136,6 +140,17 @@ python task_engine_v2/run.py --assignments task_engine_v2/configs/devices.json -
 - 点击动作 `click_text`：优先 `word`，失败后自动回退 `line`。
 
 ## 6. 执行流程
+
+### 6.0 调度触发机制
+
+- 初次启动：对当前在线设备执行一次任务链。
+- 每日触发：到达 `daily_reschedule_hour` 后，调度器会进入新一轮 generation；在线设备在当前任务链结束后会被重新触发一次。
+- 配置变更触发：`devices.json` 或其引用的任务文件发生变化后，调度器会自动进入新 generation；在线设备会按新配置重新触发。
+
+说明：
+
+- 运行中的任务链不会被强制中断；会在该轮结束后按新 generation 重新调度。
+- 该机制为后续接入服务端配置更新预留了统一触发入口（generation advance）。
 
 ### 6.1 任务启动
 

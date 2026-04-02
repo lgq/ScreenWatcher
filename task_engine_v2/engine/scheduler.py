@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from pathlib import Path
 import logging
 import threading
@@ -15,57 +16,85 @@ logger = logging.getLogger(__name__)
 
 
 class DeviceTaskScheduler:
-    def __init__(self, assignments_file: str, adb_path: str = "adb") -> None:
+    def __init__(self, assignments_file: str, adb_path: str = "adb", daily_reschedule_hour: int = 7) -> None:
         self.assignments_file = assignments_file
         self.adb_path = adb_path
         self.poll_interval_seconds = 3
         self.wifi_poll_interval_seconds = 12
+        self.daily_reschedule_hour = max(0, min(23, int(daily_reschedule_hour)))
         # config_serial -> last successfully resolved serial (may differ after port drift)
         self._wifi_resolved: dict[str, str] = {}
         self._wifi_stop_event = threading.Event()
+        self._wifi_devices: list[WifiDeviceConfig] = []
+        self._wifi_devices_lock = threading.Lock()
+        self._last_daily_reschedule_date: date | None = None
 
     def run(self) -> None:
-        assignments = load_assignments(self.assignments_file)
+        assignments_path = Path(self.assignments_file).resolve()
+        assignments, wifi_devices = self._load_schedule_config(assignments_path, log_missing_wifi=True)
         if not assignments:
             logger.warning("no valid assignments found in %s", self.assignments_file)
             return
 
-        wifi_devices = load_wifi_devices(self.assignments_file)
-        assignments_path = Path(self.assignments_file).resolve()
-        if not wifi_devices:
-            fallback_path = assignments_path.parent / "devices.json"
-            if fallback_path != assignments_path and fallback_path.exists():
-                wifi_devices = load_wifi_devices(fallback_path)
-                if wifi_devices:
-                    logger.info(
-                        "wifi_devices not found in %s, fallback to %s | count=%s",
-                        assignments_path.name,
-                        fallback_path.name,
-                        len(wifi_devices),
-                    )
-        if not wifi_devices:
-            logger.warning(
-                "no wifi devices configured in %s (supported keys: wifi_devices, adb_wifi_devices)",
-                assignments_path.name,
-            )
+        self._set_wifi_devices(wifi_devices)
+        config_revision = self._build_config_revision(assignments_path, assignments)
 
         running_threads: dict[str, threading.Thread] = {}
-        handled_devices: set[str] = set()
+        handled_generation: dict[str, int] = {}
+        schedule_generation = 0
         wifi_thread: threading.Thread | None = None
+
+        now = datetime.now()
+        if now.hour >= self.daily_reschedule_hour:
+            self._last_daily_reschedule_date = now.date()
 
         if wifi_devices:
             logger.info("scheduler connecting wifi devices | count=%s", len(wifi_devices))
             wifi_thread = threading.Thread(
                 target=self._wifi_connect_loop,
-                args=(wifi_devices,),
                 name="wifi-connect-loop",
                 daemon=True,
             )
             wifi_thread.start()
 
-        logger.info("scheduler started | watch hot-plug devices enabled")
+        logger.info(
+            "scheduler started | watch hot-plug devices enabled | daily_reschedule_hour=%s",
+            self.daily_reschedule_hour,
+        )
         try:
             while True:
+                updated_assignments, updated_wifi, updated_revision = self._reload_config_if_changed(
+                    assignments_path=assignments_path,
+                    current_revision=config_revision,
+                )
+                if updated_revision != config_revision:
+                    config_revision = updated_revision
+                    assignments = updated_assignments
+                    self._set_wifi_devices(updated_wifi)
+                    if updated_wifi and (wifi_thread is None or not wifi_thread.is_alive()):
+                        logger.info("scheduler starting wifi-connect-loop from config update | count=%s", len(updated_wifi))
+                        wifi_thread = threading.Thread(
+                            target=self._wifi_connect_loop,
+                            name="wifi-connect-loop",
+                            daemon=True,
+                        )
+                        wifi_thread.start()
+                    schedule_generation += 1
+                    logger.info(
+                        "scheduler generation advanced by config update | generation=%s | assignments=%s | wifi_devices=%s",
+                        schedule_generation,
+                        len(assignments),
+                        len(updated_wifi),
+                    )
+
+                if self._should_daily_reschedule():
+                    schedule_generation += 1
+                    logger.info(
+                        "scheduler generation advanced by daily trigger | generation=%s | trigger_hour=%s",
+                        schedule_generation,
+                        self.daily_reschedule_hour,
+                    )
+
                 # Reap finished threads.
                 finished = [device for device, thread in running_threads.items() if not thread.is_alive()]
                 for device in finished:
@@ -74,10 +103,16 @@ class DeviceTaskScheduler:
                 connected_devices = set(self._list_connected_devices())
 
                 # A disconnected device should be eligible for a fresh schedule after reconnect.
-                handled_devices.intersection_update(connected_devices)
+                handled_generation = {
+                    device: generation
+                    for device, generation in handled_generation.items()
+                    if device in connected_devices
+                }
 
                 for device in connected_devices:
-                    if device in running_threads or device in handled_devices:
+                    if device in running_threads:
+                        continue
+                    if handled_generation.get(device, -1) >= schedule_generation:
                         continue
 
                     matched_assignments = self._resolve_assignments_for_device(
@@ -106,8 +141,13 @@ class DeviceTaskScheduler:
                     thread.start()
 
                     running_threads[device] = thread
-                    handled_devices.add(device)
-                    logger.info("task chain scheduled | device=%s | count=%s", device, len(matched_assignments))
+                    handled_generation[device] = schedule_generation
+                    logger.info(
+                        "task chain scheduled | device=%s | count=%s | generation=%s",
+                        device,
+                        len(matched_assignments),
+                        schedule_generation,
+                    )
 
                 time.sleep(self.poll_interval_seconds)
         except KeyboardInterrupt:
@@ -285,12 +325,93 @@ class DeviceTaskScheduler:
             else:
                 logger.warning("wifi device connect failed | serial=%s", cfg.serial)
 
-    def _wifi_connect_loop(self, wifi_devices: list[WifiDeviceConfig]) -> None:
+    def _wifi_connect_loop(self) -> None:
         # Run one immediate attempt, then periodic retries in background.
         while not self._wifi_stop_event.is_set():
             try:
-                self._connect_wifi_devices(wifi_devices)
+                self._connect_wifi_devices(self._get_wifi_devices_snapshot())
             except Exception:
                 logger.exception("wifi connect loop failed")
             if self._wifi_stop_event.wait(self.wifi_poll_interval_seconds):
                 break
+
+    def _load_schedule_config(
+        self,
+        assignments_path: Path,
+        log_missing_wifi: bool,
+    ) -> tuple[list[DeviceAssignment], list[WifiDeviceConfig]]:
+        assignments = load_assignments(assignments_path)
+
+        wifi_devices = load_wifi_devices(assignments_path)
+        if not wifi_devices:
+            fallback_path = assignments_path.parent / "devices.json"
+            if fallback_path != assignments_path and fallback_path.exists():
+                wifi_devices = load_wifi_devices(fallback_path)
+                if wifi_devices:
+                    logger.info(
+                        "wifi_devices not found in %s, fallback to %s | count=%s",
+                        assignments_path.name,
+                        fallback_path.name,
+                        len(wifi_devices),
+                    )
+        if not wifi_devices and log_missing_wifi:
+            logger.warning(
+                "no wifi devices configured in %s (supported keys: wifi_devices, adb_wifi_devices)",
+                assignments_path.name,
+            )
+
+        return assignments, wifi_devices
+
+    def _build_config_revision(self, assignments_path: Path, assignments: list[DeviceAssignment]) -> str:
+        parts: list[str] = []
+        paths: list[Path] = [assignments_path]
+        for item in assignments:
+            task_file = Path(item.task_file)
+            if not task_file.is_absolute():
+                task_file = (assignments_path.parent / task_file).resolve()
+            paths.append(task_file)
+
+        seen: set[Path] = set()
+        for path in paths:
+            if path in seen:
+                continue
+            seen.add(path)
+            if path.exists():
+                stat = path.stat()
+                parts.append(f"{path}:{stat.st_mtime_ns}:{stat.st_size}")
+            else:
+                parts.append(f"{path}:missing")
+        return "|".join(parts)
+
+    def _reload_config_if_changed(
+        self,
+        assignments_path: Path,
+        current_revision: str,
+    ) -> tuple[list[DeviceAssignment], list[WifiDeviceConfig], str]:
+        assignments, wifi_devices = self._load_schedule_config(assignments_path, log_missing_wifi=False)
+        if not assignments:
+            logger.warning("skip empty assignments on reload | file=%s", assignments_path)
+            return [], self._get_wifi_devices_snapshot(), current_revision
+
+        revision = self._build_config_revision(assignments_path, assignments)
+        if revision == current_revision:
+            return assignments, wifi_devices, current_revision
+        return assignments, wifi_devices, revision
+
+    def _should_daily_reschedule(self) -> bool:
+        now = datetime.now()
+        today = now.date()
+        if now.hour < self.daily_reschedule_hour:
+            return False
+        if self._last_daily_reschedule_date == today:
+            return False
+        self._last_daily_reschedule_date = today
+        return True
+
+    def _set_wifi_devices(self, wifi_devices: list[WifiDeviceConfig]) -> None:
+        with self._wifi_devices_lock:
+            self._wifi_devices = list(wifi_devices)
+
+    def _get_wifi_devices_snapshot(self) -> list[WifiDeviceConfig]:
+        with self._wifi_devices_lock:
+            return list(self._wifi_devices)
