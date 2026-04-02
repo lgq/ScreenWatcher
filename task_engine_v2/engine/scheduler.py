@@ -87,8 +87,15 @@ class DeviceTaskScheduler:
                     if not matched_assignments:
                         continue
 
-                    mute_ok = ADBClient(device_id=device, adb_path=self.adb_path).ensure_muted()
-                    logger.info("device connected, mute applied | device=%s | ok=%s", device, mute_ok)
+                    adb = ADBClient(device_id=device, adb_path=self.adb_path)
+                    mute_ok = adb.ensure_muted()
+                    brightness_ok = adb.ensure_min_brightness()
+                    logger.info(
+                        "device connected, pre-actions applied | device=%s | mute_ok=%s | min_brightness_ok=%s",
+                        device,
+                        mute_ok,
+                        brightness_ok,
+                    )
 
                     thread = threading.Thread(
                         target=self._run_task_chain_for_device,

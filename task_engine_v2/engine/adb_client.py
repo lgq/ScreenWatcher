@@ -206,6 +206,29 @@ class ADBClient:
                 success = True
         return success
 
+    def ensure_min_brightness(self) -> bool:
+        """Try to set screen brightness to minimum across Android variants."""
+        commands = [
+            # Force manual brightness mode first.
+            "settings put system screen_brightness_mode 0",
+            # Set minimum brightness in classic system settings range [0,255].
+            "settings put system screen_brightness 1",
+            # Some ROMs keep VR brightness separately.
+            "settings put system screen_brightness_for_vr 1",
+            # Newer Android command interface (best-effort).
+            "cmd display set-brightness 0.01",
+        ]
+
+        success = False
+        for shell_cmd in commands:
+            try:
+                result = self._run_shell(shell_cmd, timeout=10)
+            except Exception:
+                continue
+            if result.returncode == 0:
+                success = True
+        return success
+
     def is_screen_on(self) -> bool | None:
         # Try multiple dumpsys sources for ROM compatibility.
         power_result = self._run(["shell", "dumpsys", "power"], timeout=20)
