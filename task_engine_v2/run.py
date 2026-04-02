@@ -34,6 +34,46 @@ def _get_default_assignments_path() -> str:
     return str(candidates[0] if candidates else "task_engine_v2/configs/devices.json")
 
 
+def _get_default_adb_path() -> str:
+    """
+    Auto-detect adb path in both dev and packaged environments.
+
+    Priority:
+    1) Bundled adb in packaged output
+    2) Bundled adb in build staging
+    3) System adb from PATH
+    """
+    candidates: list[Path] = []
+
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).resolve().parent
+        candidates.extend(
+            [
+                exe_dir / "platform-tools" / "adb.exe",
+                exe_dir / "_internal" / "platform-tools" / "adb.exe",
+            ]
+        )
+
+        meipass = getattr(sys, "_MEIPASS", "")
+        if meipass:
+            base_path = Path(meipass)
+            candidates.append(base_path / "platform-tools" / "adb.exe")
+
+    cwd = Path.cwd()
+    candidates.extend(
+        [
+            cwd / "build" / "staging" / "platform-tools" / "adb.exe",
+            cwd / "task_engine_v2" / "platform-tools" / "adb.exe",
+        ]
+    )
+
+    for path in candidates:
+        if path.exists():
+            return str(path)
+
+    return "adb"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Independent task runner with multi-device support")
     parser.add_argument(
@@ -41,7 +81,7 @@ def parse_args() -> argparse.Namespace:
         default=_get_default_assignments_path(),
         help="Path to device assignment json (auto-detected in dev/packaged env)",
     )
-    parser.add_argument("--adb-path", default="adb", help="adb executable path")
+    parser.add_argument("--adb-path", default=_get_default_adb_path(), help="adb executable path")
     parser.add_argument("--log-level", default="INFO", help="DEBUG/INFO/WARNING/ERROR")
     return parser.parse_args()
 
