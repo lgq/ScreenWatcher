@@ -37,6 +37,8 @@ class CompactFormatter(logging.Formatter):
     @staticmethod
     def _is_state_log(msg: str) -> bool:
         lower = msg.lower()
+        if "no scenario matched" in lower:
+            return False
         markers = (
             "task chain start item",
             "task chain finished item",
