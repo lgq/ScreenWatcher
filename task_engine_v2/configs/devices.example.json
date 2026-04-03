@@ -1,12 +1,10 @@
 {
-  "assignments": [
+  "wifi_devices": [
     {
-      "device_id": "192.168.0.112:5555",
-      "task_file": "tasks/ad_watch_kuaishou.json"
+      "serial": "192.168.0.112:5555"
     },
     {
-      "device_id": "192.168.0.115:5555",
-      "task_file": "tasks/ad_watch_demo.json"
+      "serial": "192.168.0.115:5555"
     }
   ]
 }

@@ -8,7 +8,7 @@ from engine.logging_util import setup_logging
 from engine.scheduler import DeviceTaskScheduler
 
 
-def _get_default_assignments_path() -> str:
+def _get_default_devices_path() -> str:
     """
     Auto-detect default devices.json path in both dev and packaged environments.
     
@@ -32,6 +32,29 @@ def _get_default_assignments_path() -> str:
     
     # Fallback: return first candidate (will error properly if file missing)
     return str(candidates[0] if candidates else "task_engine_v2/configs/devices.json")
+
+
+def _get_default_task_list_path() -> str:
+    """
+    Auto-detect default task_list.json path in both dev and packaged environments.
+
+    - Packaged (PyInstaller): checks _internal/defaults/task_list.json
+    - Development: checks task_engine_v2/configs/task_list.json
+    """
+    candidates = []
+
+    if getattr(sys, "frozen", False):
+        base_path = Path(sys._MEIPASS)
+        candidates.append(base_path / "defaults" / "task_list.json")
+
+    candidates.append(Path("task_engine_v2/configs/task_list.json"))
+    candidates.append(Path.cwd() / "task_engine_v2/configs/task_list.json")
+
+    for path in candidates:
+        if path.exists():
+            return str(path)
+
+    return str(candidates[0] if candidates else "task_engine_v2/configs/task_list.json")
 
 
 def _get_default_adb_path() -> str:
@@ -77,9 +100,14 @@ def _get_default_adb_path() -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Independent task runner with multi-device support")
     parser.add_argument(
-        "--assignments",
-        default=_get_default_assignments_path(),
-        help="Path to device assignment json (auto-detected in dev/packaged env)",
+        "--devices",
+        default=_get_default_devices_path(),
+        help="Path to devices json containing wifi_devices (auto-detected in dev/packaged env)",
+    )
+    parser.add_argument(
+        "--task-list",
+        default=_get_default_task_list_path(),
+        help="Path to task list json containing assignments and unified time windows",
     )
     parser.add_argument("--adb-path", default=_get_default_adb_path(), help="adb executable path")
     parser.add_argument("--log-level", default="INFO", help="DEBUG/INFO/WARNING/ERROR")
@@ -96,7 +124,8 @@ def main() -> None:
     args = parse_args()
     setup_logging(args.log_level)
     scheduler = DeviceTaskScheduler(
-        assignments_file=args.assignments,
+        devices_file=args.devices,
+        task_list_file=args.task_list,
         adb_path=args.adb_path,
         daily_reschedule_hour=args.daily_reschedule_hour,
     )

@@ -12,13 +12,13 @@
     "poll_interval_seconds": 8,
     "screenshot_dir": "task_engine_v2/screenshots",
     "save_screenshots": false,
-    "allow_start_hour": 7,
-    "allow_end_hour": 24,
     "required_activities": [],
     "scenarios": [
       {
         "name": "结束任务",
-        "screen_text": ["停止"],
+        "screen_text": [
+          "停止"
+        ],
         "action": {
           "type": "stop_task"
         },
@@ -28,6 +28,8 @@
   },
   "exit": {
     "max_duration_seconds": 600,
-    "stop_on_action_types": ["stop_task"]
+    "stop_on_action_types": [
+      "stop_task"
+    ]
   }
 }

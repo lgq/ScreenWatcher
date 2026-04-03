@@ -1,0 +1,16 @@
+{
+  "assignments": [
+    {
+      "device_id": "192.168.0.112:5555",
+      "task_file": "tasks/ad_watch_demo.json",
+      "allow_start_hour": 7,
+      "allow_end_hour": 24
+    },
+    {
+      "task_file": "tasks/kuaishou_watch_ad.json",
+      "need_loop": true,
+      "allow_start_hour": 7,
+      "allow_end_hour": 24
+    }
+  ]
+}

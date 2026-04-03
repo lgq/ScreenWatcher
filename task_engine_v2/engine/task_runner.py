@@ -6,7 +6,7 @@ import logging
 import os
 import random
 import time
-from typing import Any
+from typing import Any, Callable
 
 from .adb_client import ADBClient
 from .actions import ActionExecutor
@@ -19,7 +19,13 @@ logger = logging.getLogger(__name__)
 
 
 class TaskRunner:
-    def __init__(self, device_id: str, task: TaskConfig, adb_path: str = "adb") -> None:
+    def __init__(
+        self,
+        device_id: str,
+        task: TaskConfig,
+        adb_path: str = "adb",
+        should_stop: Callable[[], bool] | None = None,
+    ) -> None:
         self.device_id = device_id
         self.task = task
         self.adb = ADBClient(device_id=device_id, adb_path=adb_path)
@@ -30,12 +36,18 @@ class TaskRunner:
             screenshot_dir=task.execute.screenshot_dir,
             save_screenshots=task.execute.save_screenshots,
         )
+        self._should_stop_callback = should_stop
         self._next_random_swipe_due: float | None = None
 
     def run(self) -> None:
         exit_reason = "completed"
         try:
             logger.info("task start | device=%s | task=%s", self.device_id, self.task.name)
+
+            if self._should_stop_now():
+                exit_reason = "scheduler_stop"
+                logger.info("task exit by scheduler stop before start | device=%s | task=%s", self.device_id, self.task.name)
+                return
             
             # Check if current time is within allowed hours
             if not self._is_within_allowed_hours():
@@ -65,6 +77,11 @@ class TaskRunner:
             screenshot_dir.mkdir(parents=True, exist_ok=True)
 
             while True:
+                if self._should_stop_now():
+                    exit_reason = "scheduler_stop"
+                    logger.info("task exit by scheduler stop | device=%s | task=%s", self.device_id, self.task.name)
+                    return
+
                 if not self.adb.is_device_connected():
                     exit_reason = "device_disconnected"
                     logger.warning("task exit because device disconnected | device=%s", self.device_id)
@@ -144,6 +161,10 @@ class TaskRunner:
             self._exit_to_home(exit_reason)
 
     def _run_entry(self) -> bool:
+        if self._should_stop_now():
+            logger.info("entry stop by scheduler | device=%s", self.device_id)
+            return False
+
         if self.task.entry.start_from_home:
             self.adb.press_home()
             time.sleep(1)
@@ -183,6 +204,16 @@ class TaskRunner:
         # logger.info(targets and f"entry step | device=%s | step=%s | type=%s | targets=%s" or f"entry step | device=%s | step=%s | type=%s", self.device_id, step_index, step_type, targets)
 
         for attempt in range(1, max_retries + 1):
+            if self._should_stop_now():
+                logger.info(
+                    "entry step stopped by scheduler | device=%s | step=%s | attempt=%s/%s",
+                    self.device_id,
+                    step_index,
+                    attempt,
+                    max_retries,
+                )
+                return False
+
             if not self.adb.is_device_connected():
                 logger.warning(
                     "entry step stopped because device disconnected | device=%s | step=%s | attempt=%s/%s",
@@ -200,23 +231,6 @@ class TaskRunner:
                 scope=scope,
                 ocr_mode=ocr_mode,
             )
-            # if before_boxes:
-            #     logger.info(
-            #         "entry step OCR | device=%s | step=%s | type=%s | attempt=%s | boxes=%s",
-            #         self.device_id,
-            #         step_index,
-            #         step_type,
-            #         attempt,
-            #         before_boxes,
-            #     )
-            # else:
-            #     logger.info(
-            #         "entry step OCR | device=%s | step=%s | type=%s | attempt=%s | OCR failed",
-            #         self.device_id,
-            #         step_index,
-            #         step_type,
-            #         attempt,
-            #     )
             if before_boxes is None:
                 logger.warning(
                     "entry step screenshot/ocr failed | device=%s | step=%s | attempt=%s/%s",
@@ -227,24 +241,6 @@ class TaskRunner:
                 )
                 time.sleep(1)
                 continue
-
-            # if before_boxes:
-            #     logger.info(
-            #         "entry step scoped OCR | device=%s | step=%s | type=%s | attempt=%s | boxes=%s",
-            #         self.device_id,
-            #         step_index,
-            #         step_type,
-            #         attempt,
-            #         before_boxes,
-            #     )
-            # else:
-            #     logger.info(
-            #         "entry step scoped OCR | device=%s | step=%s | type=%s | attempt=%s | OCR failed",
-            #         self.device_id,
-            #         step_index,
-            #         step_type,
-            #         attempt,
-            #     )
 
             if step_type == "click_text" and not self._targets_satisfied(before_boxes, targets, target_match):
                 logger.warning(
@@ -502,7 +498,24 @@ class TaskRunner:
         return "and"
 
     def _sleep_poll(self) -> None:
-        time.sleep(self.task.execute.poll_interval_seconds)
+        total = max(0.1, float(self.task.execute.poll_interval_seconds))
+        slept = 0.0
+        step = 0.2
+        while slept < total:
+            if self._should_stop_now():
+                return
+            chunk = min(step, total - slept)
+            time.sleep(chunk)
+            slept += chunk
+
+    def _should_stop_now(self) -> bool:
+        if self._should_stop_callback is None:
+            return False
+        try:
+            return bool(self._should_stop_callback())
+        except Exception:
+            logger.debug("scheduler stop callback failed | device=%s", self.device_id, exc_info=True)
+            return False
 
     def _try_activity_random_swipe_up(self, current_activity: str) -> None:
         cfg = self.task.execute.activity_random_swipe_up or {}

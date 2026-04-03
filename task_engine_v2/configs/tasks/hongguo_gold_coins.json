@@ -28,14 +28,11 @@
   "execute": {
     "poll_interval_seconds": 3,
     "screenshot_dir": "task_engine_v2/screenshots",
-    "allow_start_hour": 7,
-    "allow_end_hour": 24,
     "required_activities": [
       "com.phoenix.read/com.dragon.read.pages.main.MainFragmentActivity",
       "com.phoenix.read/com.ss.android.excitingvideo.ExcitingVideoActivity"
     ],
     "scenarios": [
-      
       {
         "name": "请选择宝箱",
         "screen_text": [
@@ -82,7 +79,10 @@
         "action": {
           "type": "click_text",
           "target": "看视频奖励",
-          "offset": { "x": 0, "y": 120 }
+          "offset": {
+            "x": 0,
+            "y": 120
+          }
         }
       },
       {

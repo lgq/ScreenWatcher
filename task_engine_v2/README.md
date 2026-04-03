@@ -16,7 +16,8 @@
 
 - `run.py`：启动入口。
 - `engine/`：执行引擎。
-- `configs/devices.example.json`：设备与任务映射示例。
+- `configs/devices.json`：仅 WiFi 设备列表。
+- `configs/task_list.json`：任务分配与统一时间窗口。
 - `configs/tasks/*.json`：任务配置示例。
 
 ## 3. 环境准备
@@ -33,7 +34,7 @@ pip install -r task_engine_v2/requirements.txt
 ## 4. 运行方式
 
 ```bash
-python task_engine_v2/run.py --assignments task_engine_v2/configs/devices.json --log-level INFO
+python task_engine_v2/run.py --devices task_engine_v2/configs/devices.json --task-list task_engine_v2/configs/task_list.json --log-level INFO
 ```
 
 可选参数：
@@ -42,7 +43,20 @@ python task_engine_v2/run.py --assignments task_engine_v2/configs/devices.json -
 
 ## 5. 配置说明
 
-### 5.1 assignments（设备映射）
+### 5.1 devices（WiFi 设备）
+
+`devices.json` 仅维护设备连接信息：
+
+```json
+{
+  "wifi_devices": [
+    { "serial": "192.168.0.130:42379" },
+    { "serial": "192.168.0.131:37033" }
+  ]
+}
+```
+
+### 5.2 task_list（任务分配与统一时间窗口）
 
 支持两种用法：
 
@@ -53,7 +67,9 @@ python task_engine_v2/run.py --assignments task_engine_v2/configs/devices.json -
   "assignments": [
     {
       "device_id": "N0URB50103",
-      "task_file": "tasks/ad_watch_kuaishou.json"
+      "task_file": "tasks/ad_watch_kuaishou.json",
+      "allow_start_hour": 7,
+      "allow_end_hour": 24
     }
   ]
 }
@@ -65,13 +81,20 @@ python task_engine_v2/run.py --assignments task_engine_v2/configs/devices.json -
 {
   "assignments": [
     {
-      "task_file": "tasks/ad_watch_kuaishou.json"
+      "task_file": "tasks/ad_watch_kuaishou.json",
+      "allow_start_hour": 7,
+      "allow_end_hour": 24
     }
   ]
 }
 ```
 
-### 5.2 任务文件结构
+时间窗口说明：
+
+- `allow_start_hour` 和 `allow_end_hour` 统一在 `task_list.json` 中控制。
+- 任务文件中的执行时间窗口配置已废弃（保留仅用于兼容，不作为调度依据）。
+
+### 5.3 任务文件结构
 
 - `entry`：进入流程（启动应用 + steps）。
 - `execute`：循环执行参数（截图周期、activity、scenarios）。
@@ -83,12 +106,8 @@ python task_engine_v2/run.py --assignments task_engine_v2/configs/devices.json -
 - `save_screenshots`：是否保留运行截图，默认 `false`。
   - `false`：截图仅用于 OCR/匹配，使用后自动删除。
   - `true`：保留运行截图，便于排查问题。
-- `allow_start_hour` 和 `allow_end_hour`：任务运行的允许时间范围，默认 `0` 到 `24`（全天）。
-  - 使用 24 小时制。例如：上午 7 点到晚上 12 点，设置为 `"allow_start_hour": 7, "allow_end_hour": 24`。
-  - 支持跨午夜的时间范围：例如晚上 10 点到早上 6 点，设置为 `"allow_start_hour": 22, "allow_end_hour": 6`。
-  - 如果超出允许时间范围，任务会立即退出。
 
-### 5.3 entry.steps 新增字段
+### 5.4 entry.steps 新增字段
 
 通用字段：
 
@@ -114,7 +133,7 @@ python task_engine_v2/run.py --assignments task_engine_v2/configs/devices.json -
 - `check_scope`：可选。校验使用的范围；不填则回退到 `scope`。
 - `check_wait_seconds`：可选。执行动作后，校验前等待秒数；默认 `1.0`。
 
-### 5.4 scope 定义
+### 5.5 scope 定义
 
 基于当前截图实际宽高计算：
 
@@ -129,7 +148,7 @@ python task_engine_v2/run.py --assignments task_engine_v2/configs/devices.json -
 - `bottom_right`：下 20% 且右 50%
 - `full`：全屏
 
-### 5.5 OCR 模式说明
+### 5.6 OCR 模式说明
 
 - `line`：行级框，识别覆盖更完整，适合场景判断。
 - `word`：词级框，点击定位更精准。
@@ -145,7 +164,7 @@ python task_engine_v2/run.py --assignments task_engine_v2/configs/devices.json -
 
 - 初次启动：对当前在线设备执行一次任务链。
 - 每日触发：到达 `daily_reschedule_hour` 后，调度器会进入新一轮 generation；在线设备在当前任务链结束后会被重新触发一次。
-- 配置变更触发：`devices.json` 或其引用的任务文件发生变化后，调度器会自动进入新 generation；在线设备会按新配置重新触发。
+- 配置变更触发：`devices.json`、`task_list.json` 或其引用的任务文件发生变化后，调度器会自动进入新 generation；在线设备会按新配置重新触发。
 
 说明：
 

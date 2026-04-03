@@ -53,6 +53,8 @@ class DeviceAssignment:
     device_id: str
     task_file: str
     need_loop: bool = False
+    allow_start_hour: int = 0
+    allow_end_hour: int = 24
 
 
 @dataclass(slots=True)
@@ -97,8 +99,9 @@ def load_task_config(path: str | Path) -> TaskConfig:
         save_screenshots=bool(execute_data.get("save_screenshots", False)),
         scenarios=_parse_scenarios(execute_data.get("scenarios", [])),
         activity_random_swipe_up=dict(execute_data.get("activity_random_swipe_up", {})),
-        allow_start_hour=max(0, min(24, int(execute_data.get("allow_start_hour", 0)))),
-        allow_end_hour=max(0, min(24, int(execute_data.get("allow_end_hour", 24)))),
+        # Time window is controlled by task_list.json assignment-level policy.
+        allow_start_hour=0,
+        allow_end_hour=24,
     )
 
     exit_cfg = ExitConfig(
@@ -110,6 +113,7 @@ def load_task_config(path: str | Path) -> TaskConfig:
 
 
 def load_assignments(path: str | Path) -> list[DeviceAssignment]:
+    # Backward-compatible loader: old devices.json contained "assignments".
     file_path = Path(path)
     data = json.loads(file_path.read_text(encoding="utf-8"))
     raw_assignments = data.get("assignments", [])
@@ -120,7 +124,38 @@ def load_assignments(path: str | Path) -> list[DeviceAssignment]:
         need_loop = bool(item.get("need_loop", False))
         if not task_file:
             continue
-        assignments.append(DeviceAssignment(device_id=device_id, task_file=task_file, need_loop=need_loop))
+        assignments.append(
+            DeviceAssignment(
+                device_id=device_id,
+                task_file=task_file,
+                need_loop=need_loop,
+                allow_start_hour=max(0, min(24, int(item.get("allow_start_hour", 0)))),
+                allow_end_hour=max(0, min(24, int(item.get("allow_end_hour", 24)))),
+            )
+        )
+    return assignments
+
+
+def load_task_list(path: str | Path) -> list[DeviceAssignment]:
+    file_path = Path(path)
+    data = json.loads(file_path.read_text(encoding="utf-8"))
+    raw_assignments = data.get("assignments", [])
+    assignments: list[DeviceAssignment] = []
+    for item in raw_assignments:
+        device_id = str(item.get("device_id", "")).strip()
+        task_file = str(item.get("task_file", "")).strip()
+        need_loop = bool(item.get("need_loop", False))
+        if not task_file:
+            continue
+        assignments.append(
+            DeviceAssignment(
+                device_id=device_id,
+                task_file=task_file,
+                need_loop=need_loop,
+                allow_start_hour=max(0, min(24, int(item.get("allow_start_hour", 0)))),
+                allow_end_hour=max(0, min(24, int(item.get("allow_end_hour", 24)))),
+            )
+        )
     return assignments
 
 

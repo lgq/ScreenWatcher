@@ -10,7 +10,10 @@
     "steps": [
       {
         "type": "click_text",
-        "target": ["赚钱助手","助手"],
+        "target": [
+          "赚钱助手",
+          "助手"
+        ],
         "target_match": "or",
         "check_wait_seconds": 2
       },
@@ -23,8 +26,6 @@
   "execute": {
     "poll_interval_seconds": 3,
     "screenshot_dir": "task_engine_v2/screenshots",
-    "allow_start_hour": 7,
-    "allow_end_hour": 24,
     "required_activities": [
       "com.ss.android.ugc.aweme.lite/com.bytedance.android.anniex.container.AnnieXHostActivity",
       "com.ss.android.ugc.aweme.lite/com.ss.android.ugc.aweme.splash.SplashActivity"
@@ -32,7 +33,10 @@
     "scenarios": [
       {
         "name": "获得开宝箱奖励",
-        "screen_text": ["获得开宝箱奖励", "开心收下"],
+        "screen_text": [
+          "获得开宝箱奖励",
+          "开心收下"
+        ],
         "scope": "center",
         "action": {
           "type": "click_text",
@@ -41,7 +45,9 @@
       },
       {
         "name": "去签到",
-        "screen_text": ["去签到"],
+        "screen_text": [
+          "去签到"
+        ],
         "scope": "center",
         "action": {
           "type": "click_text",
@@ -50,7 +56,10 @@
       },
       {
         "name": "连续打卡7天",
-        "screen_text": ["连续打卡", "立即打卡"],
+        "screen_text": [
+          "连续打卡",
+          "立即打卡"
+        ],
         "action": {
           "type": "click_text",
           "target": "立即打卡"
@@ -60,13 +69,19 @@
         "name": "打卡-签到",
         "action": {
           "type": "click_text",
-          "target": ["立即打卡", "立即签到", "立即领取"]
+          "target": [
+            "立即打卡",
+            "立即签到",
+            "立即领取"
+          ]
         }
       }
     ]
   },
   "exit": {
     "max_duration_seconds": 30,
-    "stop_on_action_types": ["stop_task"]
+    "stop_on_action_types": [
+      "stop_task"
+    ]
   }
 }

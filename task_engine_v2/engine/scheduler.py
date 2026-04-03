@@ -7,7 +7,7 @@ import threading
 import subprocess
 import time
 
-from .models import DeviceAssignment, WifiDeviceConfig, load_assignments, load_task_config, load_wifi_devices
+from .models import DeviceAssignment, WifiDeviceConfig, load_task_config, load_task_list, load_wifi_devices
 from .adb_client import ADBClient
 from .task_runner import TaskRunner
 
@@ -16,10 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 class DeviceTaskScheduler:
-    def __init__(self, assignments_file: str, adb_path: str = "adb", daily_reschedule_hour: int = 7) -> None:
-        self.assignments_file = assignments_file
+    def __init__(self, devices_file: str, task_list_file: str, adb_path: str = "adb", daily_reschedule_hour: int = 7) -> None:
+        self.devices_file = devices_file
+        self.task_list_file = task_list_file
         self.adb_path = adb_path
         self.poll_interval_seconds = 3
+        self.low_activity_poll_interval_seconds = 5
         self.wifi_poll_interval_seconds = 12
         self.daily_reschedule_hour = max(0, min(23, int(daily_reschedule_hour)))
         # config_serial -> last successfully resolved serial (may differ after port drift)
@@ -28,18 +30,27 @@ class DeviceTaskScheduler:
         self._wifi_devices: list[WifiDeviceConfig] = []
         self._wifi_devices_lock = threading.Lock()
         self._last_daily_reschedule_date: date | None = None
+        self._allowed_windows: list[tuple[int, int]] = []
+        self._low_activity_mode = False
 
     def run(self) -> None:
-        assignments_path = Path(self.assignments_file).resolve()
-        assignments, wifi_devices = self._load_schedule_config(assignments_path, log_missing_wifi=True)
+        devices_path = Path(self.devices_file).resolve()
+        task_list_path = Path(self.task_list_file).resolve()
+        assignments, wifi_devices = self._load_schedule_config(
+            devices_path=devices_path,
+            task_list_path=task_list_path,
+            log_missing_wifi=True,
+        )
         if not assignments:
-            logger.warning("no valid assignments found in %s", self.assignments_file)
+            logger.warning("no valid assignments found in %s", self.task_list_file)
             return
 
         self._set_wifi_devices(wifi_devices)
-        config_revision = self._build_config_revision(assignments_path, assignments)
+        config_revision = self._build_config_revision(devices_path, task_list_path, assignments)
+        self._allowed_windows = self._build_allowed_windows(assignments)
 
         running_threads: dict[str, threading.Thread] = {}
+        stop_events: dict[str, threading.Event] = {}
         handled_generation: dict[str, int] = {}
         schedule_generation = 0
         wifi_thread: threading.Thread | None = None
@@ -64,12 +75,14 @@ class DeviceTaskScheduler:
         try:
             while True:
                 updated_assignments, updated_wifi, updated_revision = self._reload_config_if_changed(
-                    assignments_path=assignments_path,
+                    devices_path=devices_path,
+                    task_list_path=task_list_path,
                     current_revision=config_revision,
                 )
                 if updated_revision != config_revision:
                     config_revision = updated_revision
                     assignments = updated_assignments
+                    self._allowed_windows = self._build_allowed_windows(assignments)
                     self._set_wifi_devices(updated_wifi)
                     if updated_wifi and (wifi_thread is None or not wifi_thread.is_alive()):
                         logger.info("scheduler starting wifi-connect-loop from config update | count=%s", len(updated_wifi))
@@ -99,8 +112,30 @@ class DeviceTaskScheduler:
                 finished = [device for device, thread in running_threads.items() if not thread.is_alive()]
                 for device in finished:
                     running_threads.pop(device, None)
+                    stop_events.pop(device, None)
 
                 connected_devices = set(self._list_connected_devices())
+
+                if self._all_tasks_disallowed_now():
+                    if not self._low_activity_mode:
+                        logger.info(
+                            "scheduler enter low-activity mode | all tasks out of allowed hours | sleep=%ss",
+                            self.low_activity_poll_interval_seconds,
+                        )
+                    self._low_activity_mode = True
+                    # Stop all active device task threads when outside allowed windows.
+                    for device, event in stop_events.items():
+                        if not event.is_set():
+                            logger.info("scheduler stopping task thread by time window | device=%s", device)
+                            event.set()
+                else:
+                    if self._low_activity_mode:
+                        self._low_activity_mode = False
+                        schedule_generation += 1
+                        logger.info(
+                            "scheduler exit low-activity mode | generation=%s | resume scheduling",
+                            schedule_generation,
+                        )
 
                 # A disconnected device should be eligible for a fresh schedule after reconnect.
                 handled_generation = {
@@ -110,6 +145,8 @@ class DeviceTaskScheduler:
                 }
 
                 for device in connected_devices:
+                    if self._low_activity_mode:
+                        continue
                     if device in running_threads:
                         continue
                     if handled_generation.get(device, -1) >= schedule_generation:
@@ -132,15 +169,17 @@ class DeviceTaskScheduler:
                         brightness_ok,
                     )
 
+                    stop_event = threading.Event()
                     thread = threading.Thread(
                         target=self._run_task_chain_for_device,
-                        args=(device, matched_assignments, assignments_path),
+                        args=(device, matched_assignments, task_list_path, stop_event),
                         name=f"task-chain-{device}",
                         daemon=False,
                     )
                     thread.start()
 
                     running_threads[device] = thread
+                    stop_events[device] = stop_event
                     handled_generation[device] = schedule_generation
                     logger.info(
                         "task chain scheduled | device=%s | count=%s | generation=%s",
@@ -148,8 +187,12 @@ class DeviceTaskScheduler:
                         len(matched_assignments),
                         schedule_generation,
                     )
-
-                time.sleep(self.poll_interval_seconds)
+                sleep_seconds = (
+                    self.low_activity_poll_interval_seconds
+                    if self._low_activity_mode
+                    else self.poll_interval_seconds
+                )
+                time.sleep(sleep_seconds)
         except KeyboardInterrupt:
             logger.info("scheduler interrupted, waiting running tasks to finish")
         finally:
@@ -157,6 +200,8 @@ class DeviceTaskScheduler:
             if wifi_thread and wifi_thread.is_alive():
                 wifi_thread.join(timeout=2)
 
+        for event in stop_events.values():
+            event.set()
         for thread in running_threads.values():
             thread.join()
 
@@ -171,22 +216,32 @@ class DeviceTaskScheduler:
                 matched.append(assignment)
         return matched
 
-    def _run_task_chain_for_device(self, device_id: str, assignments: list[DeviceAssignment], assignments_path: Path) -> None:
+    def _run_task_chain_for_device(
+        self,
+        device_id: str,
+        assignments: list[DeviceAssignment],
+        task_list_path: Path,
+        stop_event: threading.Event,
+    ) -> None:
         if not assignments:
             return
 
         loop_assignments = [item for item in assignments if item.need_loop]
 
         for index, assignment in enumerate(assignments, start=1):
+            if stop_event.is_set():
+                logger.info("task chain stop by scheduler signal | device=%s", device_id)
+                return
             if not self._is_device_connected(device_id):
                 logger.warning("task chain stop because device disconnected | device=%s", device_id)
                 return
             self._run_single_assignment(
                 device_id=device_id,
                 assignment=assignment,
-                assignments_path=assignments_path,
+                task_list_path=task_list_path,
                 index=index,
                 total=len(assignments),
+                stop_event=stop_event,
             )
 
         if not loop_assignments:
@@ -195,6 +250,9 @@ class DeviceTaskScheduler:
         logger.info("task chain entering loop mode | device=%s | loop_count=%s", device_id, len(loop_assignments))
         loop_index = 0
         while True:
+            if stop_event.is_set():
+                logger.info("task chain loop stop by scheduler signal | device=%s", device_id)
+                return
             if not self._is_device_connected(device_id):
                 logger.warning("task chain loop stopped because device disconnected | device=%s", device_id)
                 return
@@ -202,10 +260,11 @@ class DeviceTaskScheduler:
             self._run_single_assignment(
                 device_id=device_id,
                 assignment=assignment,
-                assignments_path=assignments_path,
+                task_list_path=task_list_path,
                 index=loop_index + 1,
                 total=len(loop_assignments),
                 loop_mode=True,
+                stop_event=stop_event,
             )
             loop_index = (loop_index + 1) % len(loop_assignments)
 
@@ -213,16 +272,20 @@ class DeviceTaskScheduler:
         self,
         device_id: str,
         assignment: DeviceAssignment,
-        assignments_path: Path,
+        task_list_path: Path,
         index: int,
         total: int,
         loop_mode: bool = False,
+        stop_event: threading.Event | None = None,
     ) -> None:
         task_file = Path(assignment.task_file)
         if not task_file.is_absolute():
-            task_file = (assignments_path.parent / task_file).resolve()
+            task_file = (task_list_path.parent / task_file).resolve()
 
         task = load_task_config(task_file)
+        # Unified time-window control comes from task_list.json assignment entry.
+        task.execute.allow_start_hour = assignment.allow_start_hour
+        task.execute.allow_end_hour = assignment.allow_end_hour
         logger.info(
             "task chain start item | device=%s | index=%s/%s | loop_mode=%s | need_loop=%s | task=%s",
             device_id,
@@ -233,7 +296,12 @@ class DeviceTaskScheduler:
             task.name,
         )
 
-        runner = TaskRunner(device_id=device_id, task=task, adb_path=self.adb_path)
+        runner = TaskRunner(
+            device_id=device_id,
+            task=task,
+            adb_path=self.adb_path,
+            should_stop=stop_event.is_set if stop_event else None,
+        )
         runner.run()
 
         logger.info(
@@ -337,38 +405,28 @@ class DeviceTaskScheduler:
 
     def _load_schedule_config(
         self,
-        assignments_path: Path,
+        devices_path: Path,
+        task_list_path: Path,
         log_missing_wifi: bool,
     ) -> tuple[list[DeviceAssignment], list[WifiDeviceConfig]]:
-        assignments = load_assignments(assignments_path)
+        assignments = load_task_list(task_list_path)
 
-        wifi_devices = load_wifi_devices(assignments_path)
-        if not wifi_devices:
-            fallback_path = assignments_path.parent / "devices.json"
-            if fallback_path != assignments_path and fallback_path.exists():
-                wifi_devices = load_wifi_devices(fallback_path)
-                if wifi_devices:
-                    logger.info(
-                        "wifi_devices not found in %s, fallback to %s | count=%s",
-                        assignments_path.name,
-                        fallback_path.name,
-                        len(wifi_devices),
-                    )
+        wifi_devices = load_wifi_devices(devices_path)
         if not wifi_devices and log_missing_wifi:
             logger.warning(
                 "no wifi devices configured in %s (supported keys: wifi_devices, adb_wifi_devices)",
-                assignments_path.name,
+                devices_path.name,
             )
 
         return assignments, wifi_devices
 
-    def _build_config_revision(self, assignments_path: Path, assignments: list[DeviceAssignment]) -> str:
+    def _build_config_revision(self, devices_path: Path, task_list_path: Path, assignments: list[DeviceAssignment]) -> str:
         parts: list[str] = []
-        paths: list[Path] = [assignments_path]
+        paths: list[Path] = [devices_path, task_list_path]
         for item in assignments:
             task_file = Path(item.task_file)
             if not task_file.is_absolute():
-                task_file = (assignments_path.parent / task_file).resolve()
+                task_file = (task_list_path.parent / task_file).resolve()
             paths.append(task_file)
 
         seen: set[Path] = set()
@@ -385,15 +443,20 @@ class DeviceTaskScheduler:
 
     def _reload_config_if_changed(
         self,
-        assignments_path: Path,
+        devices_path: Path,
+        task_list_path: Path,
         current_revision: str,
     ) -> tuple[list[DeviceAssignment], list[WifiDeviceConfig], str]:
-        assignments, wifi_devices = self._load_schedule_config(assignments_path, log_missing_wifi=False)
+        assignments, wifi_devices = self._load_schedule_config(
+            devices_path=devices_path,
+            task_list_path=task_list_path,
+            log_missing_wifi=False,
+        )
         if not assignments:
-            logger.warning("skip empty assignments on reload | file=%s", assignments_path)
+            logger.warning("skip empty assignments on reload | file=%s", task_list_path)
             return [], self._get_wifi_devices_snapshot(), current_revision
 
-        revision = self._build_config_revision(assignments_path, assignments)
+        revision = self._build_config_revision(devices_path, task_list_path, assignments)
         if revision == current_revision:
             return assignments, wifi_devices, current_revision
         return assignments, wifi_devices, revision
@@ -415,3 +478,26 @@ class DeviceTaskScheduler:
     def _get_wifi_devices_snapshot(self) -> list[WifiDeviceConfig]:
         with self._wifi_devices_lock:
             return list(self._wifi_devices)
+
+    def _build_allowed_windows(self, assignments: list[DeviceAssignment]) -> list[tuple[int, int]]:
+        windows: list[tuple[int, int]] = []
+        for assignment in assignments:
+            windows.append((assignment.allow_start_hour, assignment.allow_end_hour))
+        return windows
+
+    def _all_tasks_disallowed_now(self) -> bool:
+        if not self._allowed_windows:
+            return False
+        current_hour = datetime.now().hour
+        for start_hour, end_hour in self._allowed_windows:
+            if self._is_hour_allowed(current_hour, start_hour, end_hour):
+                return False
+        return True
+
+    @staticmethod
+    def _is_hour_allowed(current_hour: int, start_hour: int, end_hour: int) -> bool:
+        if start_hour < end_hour:
+            return start_hour <= current_hour < end_hour
+        if start_hour > end_hour:
+            return current_hour >= start_hour or current_hour < end_hour
+        return True

@@ -17,8 +17,6 @@
   "execute": {
     "poll_interval_seconds": 3,
     "screenshot_dir": "task_engine_v2/screenshots",
-    "allow_start_hour": 7,
-    "allow_end_hour": 24,
     "required_activities": [
       "com.cat.readall/.activity.BrowserMainActivity",
       "com.cat.readall/com.ss.android.template.page.DefaultLynxActivity"
@@ -26,7 +24,10 @@
     "scenarios": [
       {
         "name": "连续打卡7天",
-        "screen_text": ["连续打卡", "继续打卡"],
+        "screen_text": [
+          "连续打卡",
+          "继续打卡"
+        ],
         "action": {
           "type": "click_text",
           "target": "继续打卡"
@@ -34,7 +35,10 @@
       },
       {
         "name": "连续打卡7天",
-        "screen_text": ["连续打卡", "立即打卡"],
+        "screen_text": [
+          "连续打卡",
+          "立即打卡"
+        ],
         "action": {
           "type": "click_text",
           "target": "立即打卡"
@@ -44,6 +48,8 @@
   },
   "exit": {
     "max_duration_seconds": 30,
-    "stop_on_action_types": ["stop_task"]
+    "stop_on_action_types": [
+      "stop_task"
+    ]
   }
 }

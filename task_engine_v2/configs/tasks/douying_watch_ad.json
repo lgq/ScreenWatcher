@@ -22,8 +22,6 @@
   "execute": {
     "poll_interval_seconds": 3,
     "screenshot_dir": "task_engine_v2/screenshots",
-    "allow_start_hour": 7,
-    "allow_end_hour": 24,
     "required_activities": [
       "com.ss.android.ugc.aweme.lite/com.ss.android.excitingvideo.ExcitingVideoActivity",
       "com.ss.android.ugc.aweme.lite/com.bytedance.android.anniex.container.AnnieXHostActivity",
@@ -32,7 +30,10 @@
     "scenarios": [
       {
         "name": "恭喜累计获得奖励",
-        "screen_text": ["恭喜累计", "评价并收下金币"],
+        "screen_text": [
+          "恭喜累计",
+          "评价并收下金币"
+        ],
         "scope": "center",
         "action": {
           "type": "click_text",
@@ -41,7 +42,9 @@
       },
       {
         "name": "领取成功",
-        "screen_text": ["领取成功"],
+        "screen_text": [
+          "领取成功"
+        ],
         "scope": "top_right",
         "action": {
           "type": "click_text",
@@ -52,6 +55,8 @@
   },
   "exit": {
     "max_duration_seconds": 30,
-    "stop_on_action_types": ["stop_task"]
+    "stop_on_action_types": [
+      "stop_task"
+    ]
   }
 }
