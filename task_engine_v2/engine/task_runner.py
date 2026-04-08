@@ -123,7 +123,7 @@ class TaskRunner:
                     scenario = find_first_matching_scenario(self.task.execute.scenarios, boxes, screen_size=screen_size)
 
                     if scenario is None:
-                        logger.info("no scenario matched | device=%s", self.device_id)
+                        # logger.info("no scenario matched | device=%s", self.device_id)
                         self._sleep_poll()
                         continue
 
