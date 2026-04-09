@@ -21,12 +21,30 @@ class ActionExecutor:
         self.save_screenshots = save_screenshots
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)
 
+    @staticmethod
+    def _scale_coords(x: int, y: int, screen_size: tuple[int, int] | None) -> tuple[int, int]:
+        """Scales coordinates from a base resolution (1264x2780) to the target screen size."""
+        if not screen_size:
+            return x, y
+
+        base_width = 1264
+        base_height = 2780
+        target_width, target_height = screen_size
+
+        # Avoid division by zero, though unlikely for screen dimensions
+        if base_width == 0 or base_height == 0:
+            return x, y
+
+        scaled_x = int(x * target_width / base_width)
+        scaled_y = int(y * target_height / base_height)
+        return scaled_x, scaled_y
+
     def execute(
-        self,
-        action: dict,
-        ocr_boxes: list[OCRBox] | None = None,
-        screen_size: tuple[int, int] | None = None,
-        apply_scope_filter: bool = True,
+            self,
+            action: dict,
+            ocr_boxes: list[OCRBox] | None = None,
+            screen_size: tuple[int, int] | None = None,
+            apply_scope_filter: bool = True,
     ) -> bool:
         action_type = str(action.get("type", "")).strip()
         if not action_type:
@@ -47,26 +65,27 @@ class ActionExecutor:
         if action_type == "tap":
             x = int(action.get("x", 0))
             y = int(action.get("y", 0))
-            offset_x, offset_y = self._parse_offset(action.get("offset"))
-            final_x = x + offset_x
-            final_y = y + offset_y
+
+            scaled_x, scaled_y = self._scale_coords(x, y, screen_size)
+            offset_x, offset_y = self._parse_offset(action.get("offset"), screen_size)
+
+            final_x = scaled_x + offset_x
+            final_y = scaled_y + offset_y
             logger.info(
-                "tap action coords | x=%s | y=%s | offset=(%s,%s) | final=(%s,%s)",
-                x,
-                y,
-                offset_x,
-                offset_y,
-                final_x,
-                final_y,
+                "tap action coords | x=%s,y=%s (scaled=%s,%s) | offset=(%s,%s) | final=(%s,%s)",
+                x, y, scaled_x, scaled_y, offset_x, offset_y, final_x, final_y
             )
             return self.adb.tap(final_x, final_y)
 
         if action_type == "swipe":
+            start_x, start_y = self._scale_coords(int(action.get("start_x", 0)), int(action.get("start_y", 0)), screen_size)
+            end_x, end_y = self._scale_coords(int(action.get("end_x", 0)), int(action.get("end_y", 0)), screen_size)
+
             return self.adb.swipe(
-                int(action.get("start_x", 0)),
-                int(action.get("start_y", 0)),
-                int(action.get("end_x", 0)),
-                int(action.get("end_y", 0)),
+                start_x,
+                start_y,
+                end_x,
+                end_y,
                 int(action.get("duration_ms", 300)),
             )
 
@@ -85,7 +104,7 @@ class ActionExecutor:
         if action_type == "click_text":
             targets = self._normalize_targets(action.get("target", ""))
             match_mode = self._normalize_match_mode(action.get("target_match", "and"))
-            offset_x, offset_y = self._parse_offset(action.get("offset"))
+            offset_x, offset_y = self._parse_offset(action.get("offset"), screen_size)
             scope = str(action.get("scope", "full"))
             ocr_mode = str(action.get("ocr_mode", "word")).strip().lower()
             if not targets:
@@ -191,10 +210,10 @@ class ActionExecutor:
         return None
 
     def _find_click_target(
-        self,
-        boxes: list[OCRBox],
-        targets: list[str],
-        match_mode: str,
+            self,
+            boxes: list[OCRBox],
+            targets: list[str],
+            match_mode: str,
     ) -> tuple[str | None, OCRBox | None]:
         if match_mode == "or":
             for target in targets:
@@ -230,16 +249,16 @@ class ActionExecutor:
             return "or"
         return "and"
 
-    @staticmethod
-    def _parse_offset(raw_offset: Any) -> tuple[int, int]:
+    def _parse_offset(self, raw_offset: Any, screen_size: tuple[int, int] | None) -> tuple[int, int]:
         if not isinstance(raw_offset, dict):
             return 0, 0
         try:
             offset_x = int(raw_offset.get("x", 0))
             offset_y = int(raw_offset.get("y", 0))
-        except Exception:
+        except (ValueError, TypeError):
             return 0, 0
-        return offset_x, offset_y
+
+        return self._scale_coords(offset_x, offset_y, screen_size)
 
     @staticmethod
     def _estimate_target_center(box: OCRBox, target: str) -> tuple[int, int, int, int]:
