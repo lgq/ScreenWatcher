@@ -1,0 +1,97 @@
+{
+  "name": "抖音极速版-赚钱助手",
+  "entry": {
+    "start_from_home": true,
+    "launch": {
+      "package": "com.motorola.launcher3",
+      "activity": "com.android.launcher3.CustomizationPanelLauncher",
+      "wait_seconds": 4
+    },
+    "steps": [
+      {
+        "type": "tap",
+        "x": 180,
+        "y": 300
+      },
+      {
+        "type": "sleep",
+        "seconds": 2
+      }
+    ]
+  },
+  "execute": {
+    "poll_interval_seconds": 3,
+    "screenshot_dir": "task_engine_v2/screenshots",
+    "required_activities": [
+      "com.ss.android.ugc.aweme.lite/com.bytedance.android.anniex.container.AnnieXHostActivity",
+      "com.ss.android.ugc.aweme.lite/com.ss.android.ugc.aweme.splash.SplashActivity",
+      "com.ss.android.ugc.aweme.lite/com.ss.android.ugc.aweme.bullet.ui.BulletContainerActivity",
+      "com.ss.android.ugc.aweme.lite/com.ss.android.excitingvideo.ExcitingVideoActivity"
+    ],
+    "scenarios": [
+      {
+        "name": "天天预约领金币",
+        "scope": "center",
+        "action": {
+          "type": "click_text",
+          "click_target": "约领取"
+        }
+      },
+      {
+        "name": "恭喜预约成功",
+        "scope": "center",
+        "action": {
+          "type": "click_text",
+          "click_target": "提醒我来领"
+        }
+      },
+      {
+        "name": "获得开宝箱奖励",
+        "scope": "center",
+        "action": {
+          "type": "click_text",
+          "click_target": "开心收下"
+        }
+      },
+      {
+        "name": "再看一个视频额外获得",
+        "scope": "center",
+        "action": {
+          "type": "click_text",
+          "click_target": [
+            "领取奖励",
+            "看广告视频打开"
+          ],
+          "target_match": "or"
+        }
+      },
+      {
+        "name": "领取成功",
+        "have_text": [
+          "领取成功"
+        ],
+        "scope": "top_right",
+        "action": {
+          "type": "click_text",
+          "click_target": "领取成功"
+        }
+      },
+      {
+        "name": "恭喜累计获得奖励",
+        "have_text": [
+          "评价并收下金币"
+        ],
+        "scope": "top_right",
+        "action": {
+          "type": "stop_task"
+        }
+      }
+    ]
+  },
+  "exit": {
+    "max_duration_seconds": 300,
+    "stop_on_action_types": [
+      "stop_task"
+    ]
+  }
+}

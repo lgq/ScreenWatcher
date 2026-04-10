@@ -28,6 +28,12 @@
       "allow_end_hour": 24
     },
     {
+      "task_file": "tasks/douying_zhuanqianzhushou.json",
+      "need_loop": true,
+      "allow_start_hour": 7,
+      "allow_end_hour": 24
+    },
+    {
       "task_file": "tasks/kuaishou_watch_ad.json",
       "need_loop": true,
       "allow_start_hour": 7,
