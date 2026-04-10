@@ -9,9 +9,9 @@
     "steps": [
       {
         "type": "click_text",
-        "click_target": "朋友",
+        "click_target": "首页",
         "offset": {
-          "x": 250,
+          "x": 500,
           "y": 0
         },
         "scope": "bottom"
