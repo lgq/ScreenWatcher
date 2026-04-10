@@ -8,13 +8,9 @@
     },
     "steps": [
       {
-        "type": "click_text",
-        "click_target": "首页",
-        "offset": {
-          "x": 500,
-          "y": 0
-        },
-        "scope": "bottom"
+        "type": "tap",
+        "x": 630,
+        "y": 2620
       },
       {
         "type": "sleep",
@@ -71,7 +67,8 @@
           "click_target": [
             "立即打卡",
             "立即签到",
-            "立即领取"
+            "立即领取",
+            "明天再来"
           ],
           "target_match": "or"
         }
