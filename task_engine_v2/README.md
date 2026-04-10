@@ -102,12 +102,120 @@ python task_engine_v2/run.py --devices task_engine_v2/configs/devices.json --tas
 
 `execute` 关键字段补充：
 
+- `poll_interval_seconds`：每轮循环的轮询间隔秒数，默认 `5`。
+- `required_activities`：允许执行任务的 Activity 白名单。当前 Activity 不在此列表时，会先执行一次 `back`，然后进入下一轮。
 - `screenshot_dir`：截图目录。
 - `save_screenshots`：是否保留运行截图，默认 `false`。
   - `false`：截图仅用于 OCR/匹配，使用后自动删除。
   - `true`：保留运行截图，便于排查问题。
+- `scenarios`：场景列表，按配置顺序依次匹配，命中第一个后立即执行其 `action`，本轮不再继续匹配后续 scenario。
+- `activity_random_swipe_up`：可选。在指定 Activity 中按随机间隔执行上滑，适合“刷视频”类任务。
+  - `enabled`：是否启用。
+  - `activities`：限定在哪些 Activity 中触发；为空时表示所有 `required_activities` 命中的页面都可触发。
+  - `interval_min_seconds` / `interval_max_seconds`：两次随机上滑的最小/最大间隔秒数。
+  - `start_x` / `start_y` / `end_x` / `end_y`：滑动起止坐标。
+  - `duration_ms`：滑动时长，单位毫秒。
 
-### 5.4 entry.steps 与 action 字段说明
+### 5.4 execute.scenarios 配置说明
+
+基本示例：
+
+```json
+{
+  "execute": {
+    "poll_interval_seconds": 3,
+    "required_activities": [
+      "com.example/.MainActivity"
+    ],
+    "scenarios": [
+      {
+        "name": "领取奖励",
+        "have_text": ["恭喜获得", "领取奖励"],
+        "scope": "center",
+        "action": {
+          "type": "click_text",
+          "click_target": "领取奖励"
+        }
+      },
+      {
+        "name": "兜底关闭",
+        "have_text": [],
+        "scope": "top_right",
+        "action": {
+          "type": "tap",
+          "x": 1180,
+          "y": 180
+        }
+      }
+    ]
+  }
+}
+```
+
+匹配规则：
+
+- `scenarios` 按数组顺序依次判断，命中首个后立即执行，不会继续尝试后面的 scenario。
+- 场景判断使用 `line` OCR 结果，适合做页面文案识别。
+- `have_text` 中的文本关系是 **AND**：数组内所有文本都命中才算匹配。
+- 文本匹配时会忽略空格，采用“包含”判断，不要求整行完全相等。
+- `scope` 会先裁剪识别区域，再在该区域内判断 `have_text`。
+- 当 `have_text` 为空数组，或未配置 `have_text` 时，该 scenario 会被视为“无条件命中”。通常应放在最后作为兜底，否则会抢先命中，导致后续 scenario 不再执行。
+
+`scenario` 支持字段：
+
+- `name`：可选。场景名称，仅用于日志输出，未填写时默认 `unnamed-scenario`。
+- `have_text`：可选，字符串数组。用于描述命中该场景必须出现的文本。
+- `scope`：可选，默认 `full`。表示该 scenario 的识别范围。
+- `action`：必填。命中后的动作配置，支持的动作类型见下文。
+- `stop_task`：可选，默认 `false`。为 `true` 时，当前 scenario 执行完后立即结束任务。
+
+### 5.5 execute.scenarios.action 支持的参数说明
+
+`scenario.action` 与 `entry.steps` 使用同一套动作执行器，支持的 `type` 如下：
+
+- `click_text`
+- `tap`
+- `swipe`
+- `back`
+- `home`
+- `sleep`
+- `launch_app`
+- `stop_task`
+
+各动作参数：
+
+- `click_text`
+  - `type`：固定为 `click_text`。
+  - `click_target`：必填。要点击的目标文本，可为字符串或字符串数组。
+  - `target_match`：可选。仅当 `click_target` 为数组时生效；`and`（默认）表示全部命中，`or` 表示任意一个命中即可。
+  - `scope`：可选，默认 `full`。点击目标文本时使用的 OCR 范围。
+  - `offset`：可选。点击偏移量，格式 `{"x": 10, "y": -20}`。
+  - `ocr_mode`：可选。支持 `line` / `word` / `hybrid`。不过在 `execute` 循环里，`click_text` 当前默认仍是“优先 `word`，失败回退 `line`”。
+- `tap`
+  - `type`：固定为 `tap`。
+  - `x` / `y`：必填。点击坐标。
+  - `offset`：可选。点击偏移量。
+- `swipe`
+  - `type`：固定为 `swipe`。
+  - `start_x` / `start_y`：必填。起点坐标。
+  - `end_x` / `end_y`：必填。终点坐标。
+  - `duration_ms`：可选，默认 `300`。
+- `sleep`
+  - `type`：固定为 `sleep`。
+  - `seconds`：可选，默认 `1`。
+- `launch_app`
+  - `type`：固定为 `launch_app`。
+  - `package`：必填。应用包名。
+  - `activity`：可选。启动 Activity。
+- `back` / `home` / `stop_task`
+  - 仅需 `type` 字段，无额外参数。
+
+坐标相关说明：
+
+- `tap`、`swipe`、`offset` 中的坐标，均按 `1264x2780` 基准分辨率编写。
+- 引擎运行时会根据当前设备实际分辨率自动等比例缩放。
+
+### 5.6 entry.steps 与 action 字段说明
 
 通用字段：
 
@@ -133,7 +241,7 @@ python task_engine_v2/run.py --devices task_engine_v2/configs/devices.json --tas
 - `check_scope`：可选。校验使用的范围；不填则回退到 `scope`。
 - `check_wait_seconds`：可选。执行动作后，校验前等待秒数；默认 `1.0`。
 
-### 5.5 scope 定义
+### 5.7 scope 定义
 
 基于当前截图实际宽高计算：
 
@@ -148,7 +256,7 @@ python task_engine_v2/run.py --devices task_engine_v2/configs/devices.json --tas
 - `bottom_right`：下 20% 且右 50%
 - `full`：全屏
 
-### 5.6 OCR 模式说明
+### 5.8 OCR 模式说明
 
 - `line`：行级框，识别覆盖更完整，适合场景判断。
 - `word`：词级框，点击定位更精准。
