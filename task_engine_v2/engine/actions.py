@@ -102,7 +102,7 @@ class ActionExecutor:
             return True
 
         if action_type == "click_text":
-            targets = self._normalize_targets(action.get("target", ""))
+            targets = self._normalize_targets(action.get("click_target", ""))
             match_mode = self._normalize_match_mode(action.get("target_match", "and"))
             offset_x, offset_y = self._parse_offset(action.get("offset"), screen_size)
             scope = str(action.get("scope", "full"))

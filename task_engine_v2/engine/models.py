@@ -9,7 +9,7 @@ import json
 @dataclass(slots=True)
 class ScenarioConfig:
     name: str
-    screen_text: list[str]
+    have_text: list[str]
     action: dict[str, Any]
     scope: str = "full"
     stop_task: bool = False
@@ -70,7 +70,7 @@ def _parse_scenarios(raw_scenarios: list[dict[str, Any]]) -> list[ScenarioConfig
             ScenarioConfig(
                 name=str(item.get("name", "unnamed-scenario")),
                 scope=str(item.get("scope", "full")),
-                screen_text=[str(x) for x in item.get("screen_text", [])],
+                have_text=[str(x) for x in item.get("have_text", [])],
                 action=dict(item.get("action", {})),
                 stop_task=bool(item.get("stop_task", False)),
             )

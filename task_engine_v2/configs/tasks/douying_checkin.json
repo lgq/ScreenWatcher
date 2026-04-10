@@ -1,21 +1,20 @@
 {
-  "name": "抖音极速版-打卡签到",
+  "name": "抖音极速版-签到领金币",
   "entry": {
     "start_from_home": true,
     "launch": {
-      "package": "com.motorola.launcher3",
-      "activity": "com.android.launcher3.CustomizationPanelLauncher",
+      "package": "com.ss.android.ugc.aweme.lite",
       "wait_seconds": 4
     },
     "steps": [
       {
         "type": "click_text",
-        "target": [
-          "赚钱助手",
-          "助手"
-        ],
-        "target_match": "or",
-        "check_wait_seconds": 2
+        "click_target": "朋友",
+        "offset": {
+          "x": 250,
+          "y": 0
+        },
+        "scope": "bottom"
       },
       {
         "type": "sleep",
@@ -33,43 +32,43 @@
     "scenarios": [
       {
         "name": "获得开宝箱奖励",
-        "screen_text": [
+        "have_text": [
           "获得开宝箱奖励",
           "开心收下"
         ],
         "scope": "center",
         "action": {
           "type": "click_text",
-          "target": "开心收下"
+          "click_target": "开心收下"
         }
       },
       {
         "name": "去签到",
-        "screen_text": [
+        "have_text": [
           "去签到"
         ],
         "scope": "center",
         "action": {
           "type": "click_text",
-          "target": "去签到"
+          "click_target": "去签到"
         }
       },
       {
         "name": "连续打卡7天",
-        "screen_text": [
+        "have_text": [
           "连续打卡",
           "立即打卡"
         ],
         "action": {
           "type": "click_text",
-          "target": "立即打卡"
+          "click_target": "立即打卡"
         }
       },
       {
         "name": "打卡-签到",
         "action": {
           "type": "click_text",
-          "target": [
+          "click_target": [
             "立即打卡",
             "立即签到",
             "立即领取"

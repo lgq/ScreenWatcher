@@ -9,14 +9,14 @@
     "steps": [
       {
         "type": "click_text",
-        "target": [
+        "click_target": [
           "福利",
           "赚钱"
         ],
         "target_match": "or",
         "scope": "bottom",
         "check_wait_seconds": 2,
-        "check": "金币收益",
+        "check_if_have": "金币收益",
         "check_scope": "top"
       },
       {
@@ -35,50 +35,50 @@
     "scenarios": [
       {
         "name": "请选择宝箱",
-        "screen_text": [
+        "have_text": [
           "坚持退出",
           "继续观看"
         ],
         "scope": "center",
         "action": {
           "type": "click_text",
-          "target": "继续观看"
+          "click_target": "继续观看"
         }
       },
       {
         "name": "恭喜获得开宝箱奖励",
-        "screen_text": [
+        "have_text": [
           "恭喜获得开宝箱奖励",
           "看视频最高"
         ],
         "scope": "center",
         "action": {
           "type": "click_text",
-          "target": "看视频最高"
+          "click_target": "看视频最高"
         }
       },
       {
         "name": "再看一个视频",
-        "screen_text": [
+        "have_text": [
           "再看一个视频",
           "领取奖励"
         ],
         "scope": "center",
         "action": {
           "type": "click_text",
-          "target": "领取奖励"
+          "click_target": "领取奖励"
         }
       },
       {
         "name": "请选择宝箱",
-        "screen_text": [
+        "have_text": [
           "金币",
           "看视频奖励"
         ],
         "scope": "center_right",
         "action": {
           "type": "click_text",
-          "target": "看视频奖励",
+          "click_target": "看视频奖励",
           "offset": {
             "x": 0,
             "y": 120
@@ -87,7 +87,7 @@
       },
       {
         "name": "领取成功 X",
-        "screen_text": [
+        "have_text": [
           "广告",
           "领取成功",
           "×"
@@ -95,17 +95,17 @@
         "scope": "top",
         "action": {
           "type": "click_text",
-          "target": "×"
+          "click_target": "×"
         }
       },
       {
         "name": "点击领金币",
-        "screen_text": [
+        "have_text": [
           "点击领"
         ],
         "action": {
           "type": "click_text",
-          "target": "点击领"
+          "click_target": "点击领"
         }
       }
     ]

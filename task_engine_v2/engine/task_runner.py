@@ -197,11 +197,10 @@ class TaskRunner:
 
     def _run_entry_step_with_retry(self, step: dict, step_index: int, max_retries: int) -> bool:
         step_type = str(step.get("type", ""))
-        targets = self._normalize_targets(step.get("target", ""))
+        targets = self._normalize_targets(step.get("click_target", ""))
         target_match = self._normalize_match_mode(step.get("target_match", "and"))
         scope = str(step.get("scope", "full"))
         ocr_mode = str(step.get("ocr_mode", "line")).strip().lower()
-        # logger.info(targets and f"entry step | device=%s | step=%s | type=%s | targets=%s" or f"entry step | device=%s | step=%s | type=%s", self.device_id, step_index, step_type, targets)
 
         for attempt in range(1, max_retries + 1):
             if self._should_stop_now():
@@ -327,7 +326,7 @@ class TaskRunner:
         return False
 
     def _is_entry_step_completed(self, step: dict, step_index: int, attempt: int) -> bool:
-        check = step.get("check")
+        check = step.get("check_if_have")
         if not check:
             return True
 

@@ -10,7 +10,7 @@
     "steps": [
       {
         "type": "click_text",
-        "target": "赚钱助手",
+        "click_target": "赚钱助手",
         "check_wait_seconds": 2
       },
       {
@@ -30,25 +30,25 @@
     "scenarios": [
       {
         "name": "恭喜累计获得奖励",
-        "screen_text": [
+        "have_text": [
           "恭喜累计",
           "评价并收下金币"
         ],
         "scope": "center",
         "action": {
           "type": "click_text",
-          "target": "评价并收下金币"
+          "click_target": "评价并收下金币"
         }
       },
       {
         "name": "领取成功",
-        "screen_text": [
+        "have_text": [
           "领取成功"
         ],
         "scope": "top_right",
         "action": {
           "type": "click_text",
-          "target": "领取成功"
+          "click_target": "领取成功"
         }
       }
     ]

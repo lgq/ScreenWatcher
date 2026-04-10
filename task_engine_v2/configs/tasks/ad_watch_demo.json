@@ -16,7 +16,7 @@
     "scenarios": [
       {
         "name": "结束任务",
-        "screen_text": [
+        "have_text": [
           "停止"
         ],
         "action": {

@@ -10,10 +10,10 @@
     "steps": [
       {
         "type": "click_text",
-        "target": "赚",
+        "click_target": "赚",
         "scope": "bottom",
         "check_wait_seconds": 2,
-        "check": "任务中心",
+        "check_if_have": "任务中心",
         "check_scope": "top"
       },
       {
@@ -22,7 +22,7 @@
       },
       {
         "type": "click_text",
-        "target": "看广告得金币"
+        "click_target": "看广告得金币"
       }
     ]
   },
@@ -36,80 +36,80 @@
     "scenarios": [
       {
         "name": "瓜分百亿金币",
-        "screen_text": [
+        "have_text": [
           "瓜分",
           "立即参与"
         ],
         "scope": "center",
         "action": {
           "type": "click_text",
-          "target": "立即参与"
+          "click_target": "立即参与"
         }
       },
       {
         "name": "任务中心-看广告",
-        "screen_text": [
+        "have_text": [
           "任务中心",
           "看广告得金币",
           "领福利"
         ],
         "action": {
           "type": "click_text",
-          "target": "领福利"
+          "click_target": "领福利"
         }
       },
       {
         "name": "看完广告",
         "scope": "center",
-        "screen_text": [
+        "have_text": [
           "再看1个广告",
           "奖励"
         ],
         "action": {
           "type": "click_text",
-          "target": "奖励"
+          "click_target": "奖励"
         }
       },
       {
         "name": "看完广告-领取奖励",
         "scope": "center",
-        "screen_text": [
+        "have_text": [
           "再看一个再领",
           "领取奖励"
         ],
         "action": {
           "type": "click_text",
-          "target": "领取奖励"
+          "click_target": "领取奖励"
         }
       },
       {
         "name": "额外金币",
         "scope": "center",
-        "screen_text": [
+        "have_text": [
           "额外",
           "领取额外金币"
         ],
         "action": {
           "type": "click_text",
-          "target": "领取额外金币"
+          "click_target": "领取额外金币"
         }
       },
       {
         "name": "签到去看视频",
         "scope": "center",
-        "screen_text": [
+        "have_text": [
           "签到可领",
           "去看视频"
         ],
         "action": {
           "type": "click_text",
-          "target": "去看视频"
+          "click_target": "去看视频"
         }
       },
       {
         "name": "顶部滑动关闭",
         "scope": "top_left",
-        "screen_text": [
+        "have_text": [
           "功领取"
         ],
         "action": {

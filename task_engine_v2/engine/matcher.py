@@ -23,6 +23,6 @@ def find_first_matching_scenario(
     height = screen_size[1] if screen_size else None
     for scenario in scenarios:
         scoped_boxes = filter_by_scope(boxes, scenario.scope, width=width, height=height)
-        if all(_contains_text(scoped_boxes, txt) for txt in scenario.screen_text):
+        if all(_contains_text(scoped_boxes, txt) for txt in scenario.have_text):
             return scenario
     return None

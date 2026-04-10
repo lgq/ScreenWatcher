@@ -97,7 +97,7 @@ python task_engine_v2/run.py --devices task_engine_v2/configs/devices.json --tas
 ### 5.3 任务文件结构
 
 - `entry`：进入流程（启动应用 + steps）。
-- `execute`：循环执行参数（截图周期、activity、scenarios）。
+- `execute`：循环执行参数（截图周期、activity、scenarios 配置中的 `have_text` 匹配）。
 - `exit`：退出条件（最长时长、动作触发）。
 
 `execute` 关键字段补充：
@@ -107,29 +107,29 @@ python task_engine_v2/run.py --devices task_engine_v2/configs/devices.json --tas
   - `false`：截图仅用于 OCR/匹配，使用后自动删除。
   - `true`：保留运行截图，便于排查问题。
 
-### 5.4 entry.steps 新增字段
+### 5.4 entry.steps 与 action 字段说明
 
 通用字段：
 
 - `type`：动作类型。
-- `target`：动作目标文本。可为字符串或字符串数组。
-  - 字符串示例：`"target": "福利"`
-  - 数组示例：`"target": ["福利", "任务"]`
-- `target_match`：可选。仅当 `target` 为数组时生效。
+- `click_target`：动作目标文本。可为字符串或字符串数组。
+  - 字符串示例：`"click_target": "福利"`
+  - 数组示例：`"click_target": ["福利", "任务"]`
+- `target_match`：可选。仅当 `click_target` 为数组时生效。
   - `"and"`（默认）：数组内文本都要命中。
   - `"or"`：数组内任意一个命中即可。
-- `offset`：可选。点击偏移量，格式为 `{"x": 10, "y": -20}`。
+- `offset`：可选。点击偏移量，格式为 `{"x": 10, "y": -20}`。该坐标值基于 `1264x2780` 的基准分辨率测量，引擎会在运行时自动根据当前设备的屏幕物理尺寸进行等比例自适应缩放。
   - 正数表示在原坐标基础上增加。
   - 负数表示在原坐标基础上减少。
   - 当前对 `tap` 和 `click_text` 生效。
 - `scope`：识别范围（见下方 scope 定义）。
 - `ocr_mode`：OCR 粒度（`line` 或 `word`）。
 
-校验相关字段：
+校验相关字段（针对 entry.steps）：
 
-- `check`：可选。存在时表示该 step 执行后需要做 OCR 校验。
-  - 可为字符串：`"check": "任务中心"`
-  - 可为数组：`"check": ["任务中心", "看广告得金币"]`
+- `check_if_have`：可选。存在时表示该 step 执行后需要做 OCR 校验。
+  - 可为字符串：`"check_if_have": "任务中心"`
+  - 可为数组：`"check_if_have": ["任务中心", "看广告得金币"]`
 - `check_scope`：可选。校验使用的范围；不填则回退到 `scope`。
 - `check_wait_seconds`：可选。执行动作后，校验前等待秒数；默认 `1.0`。
 
@@ -182,7 +182,7 @@ python task_engine_v2/run.py --devices task_engine_v2/configs/devices.json --tas
 1. 截图。
 2. 若配置了 `scope`，先按 scope 裁剪，再 OCR（坐标会映射回全图）。
 3. 执行动作（`click_text` 会优先 word，再回退 line）。
-4. 若配置了 `check`：等待 `check_wait_seconds` 后截图并 OCR 校验。
+4. 若配置了 `check_if_have`：等待 `check_wait_seconds` 后截图并 OCR 校验。
 5. 校验通过进入下一 step；5 次失败退出任务。
 
 ### 6.3 execute 循环
