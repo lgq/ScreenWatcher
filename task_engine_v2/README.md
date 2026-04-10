@@ -194,6 +194,8 @@ python task_engine_v2/run.py --devices task_engine_v2/configs/devices.json --tas
 - `tap`
   - `type`：固定为 `tap`。
   - `x` / `y`：必填。点击坐标。
+    - 传整数时，表示基于 `1264x2780` 基准分辨率的绝对坐标，运行时会自动按设备分辨率缩放。
+    - 传 `0.0 ~ 1.0` 之间的小数时，表示按屏幕宽高的百分比点击。例如：`"x": 0.5, "y": 0.6` 表示点击屏幕宽度 50%、高度 60% 的位置。
   - `offset`：可选。点击偏移量。
 - `swipe`
   - `type`：固定为 `swipe`。
@@ -214,6 +216,7 @@ python task_engine_v2/run.py --devices task_engine_v2/configs/devices.json --tas
 
 - `tap`、`swipe`、`offset` 中的坐标，均按 `1264x2780` 基准分辨率编写。
 - 引擎运行时会根据当前设备实际分辨率自动等比例缩放。
+- 仅 `tap.x` / `tap.y` 支持百分比写法；当值为 `0.0 ~ 1.0` 的小数时，会按当前屏幕尺寸直接换算，不再走基准分辨率缩放。
 
 ### 5.6 entry.steps 与 action 字段说明
 
@@ -230,6 +233,7 @@ python task_engine_v2/run.py --devices task_engine_v2/configs/devices.json --tas
   - 正数表示在原坐标基础上增加。
   - 负数表示在原坐标基础上减少。
   - 当前对 `tap` 和 `click_text` 生效。
+  - `tap` 本身若使用百分比坐标，`offset` 仍然按基准分辨率缩放后再叠加。
 - `scope`：识别范围（见下方 scope 定义）。
 - `ocr_mode`：OCR 粒度（`line` 或 `word`）。
 

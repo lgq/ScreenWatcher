@@ -39,6 +39,58 @@ class ActionExecutor:
         scaled_y = int(y * target_height / base_height)
         return scaled_x, scaled_y
 
+    @staticmethod
+    def _is_percentage_value(raw_value: Any) -> bool:
+        if isinstance(raw_value, float):
+            return 0.0 <= raw_value <= 1.0
+        if isinstance(raw_value, str):
+            value = raw_value.strip()
+            if not value or "." not in value:
+                return False
+            try:
+                parsed = float(value)
+            except ValueError:
+                return False
+            return 0.0 <= parsed <= 1.0
+        return False
+
+    def _resolve_tap_axis(
+            self,
+            raw_value: Any,
+            axis_size: int | None,
+            axis_name: str,
+    ) -> int:
+        if self._is_percentage_value(raw_value):
+            if axis_size is None or axis_size <= 0:
+                raise ValueError(f"tap percentage {axis_name} requires screen size")
+            ratio = float(raw_value)
+            resolved = int(round(axis_size * ratio))
+            return max(0, min(axis_size - 1, resolved))
+
+        try:
+            return int(raw_value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"invalid tap {axis_name}: {raw_value}") from exc
+
+    def _resolve_tap_coords(
+            self,
+            action: dict[str, Any],
+            screen_size: tuple[int, int] | None,
+    ) -> tuple[int, int, str]:
+        raw_x = action.get("x", 0)
+        raw_y = action.get("y", 0)
+        width = screen_size[0] if screen_size else None
+        height = screen_size[1] if screen_size else None
+
+        resolved_x = self._resolve_tap_axis(raw_x, width, "x")
+        resolved_y = self._resolve_tap_axis(raw_y, height, "y")
+
+        if self._is_percentage_value(raw_x) or self._is_percentage_value(raw_y):
+            return resolved_x, resolved_y, "percentage"
+
+        scaled_x, scaled_y = self._scale_coords(resolved_x, resolved_y, screen_size)
+        return scaled_x, scaled_y, "absolute"
+
     def execute(
             self,
             action: dict,
@@ -63,17 +115,26 @@ class ActionExecutor:
             return self.adb.press_home()
 
         if action_type == "tap":
-            x = int(action.get("x", 0))
-            y = int(action.get("y", 0))
-
-            scaled_x, scaled_y = self._scale_coords(x, y, screen_size)
+            try:
+                scaled_x, scaled_y, coord_mode = self._resolve_tap_coords(action, screen_size)
+            except ValueError as exc:
+                logger.error(str(exc))
+                return False
             offset_x, offset_y = self._parse_offset(action.get("offset"), screen_size)
 
             final_x = scaled_x + offset_x
             final_y = scaled_y + offset_y
             logger.info(
-                "tap action coords | x=%s,y=%s (scaled=%s,%s) | offset=(%s,%s) | final=(%s,%s)",
-                x, y, scaled_x, scaled_y, offset_x, offset_y, final_x, final_y
+                "tap action coords | mode=%s | x=%s,y=%s | resolved=(%s,%s) | offset=(%s,%s) | final=(%s,%s)",
+                coord_mode,
+                action.get("x", 0),
+                action.get("y", 0),
+                scaled_x,
+                scaled_y,
+                offset_x,
+                offset_y,
+                final_x,
+                final_y,
             )
             return self.adb.tap(final_x, final_y)
 
