@@ -72,13 +72,14 @@
             "立即打卡",
             "立即签到",
             "立即领取"
-          ]
+          ],
+          "target_match": "or"
         }
       }
     ]
   },
   "exit": {
-    "max_duration_seconds": 30,
+    "max_duration_seconds": 100,
     "stop_on_action_types": [
       "stop_task"
     ]
